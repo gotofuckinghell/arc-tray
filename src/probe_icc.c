@@ -44,7 +44,6 @@ int main(void) {
   ze_result_t (*domMask)(ze_handle, uint32_t *) = (void *)GetProcAddress(z, "zesDeviceGetOverclockDomains");
   ze_result_t (*domEnum)(ze_handle, uint32_t *, ze_handle *) = (void *)GetProcAddress(z, "zesDeviceEnumOverclockDomains");
   ze_result_t (*domProps)(ze_handle, oc_props_t *) = (void *)GetProcAddress(z, "zesOverclockGetDomainProperties");
-  ze_result_t (*ctrlMask)(ze_handle, int32_t, uint32_t *) = (void *)GetProcAddress(z, "zesDeviceGetOverclockControls");
   ze_result_t (*ctrlCur)(ze_handle, int32_t, double *) = (void *)GetProcAddress(z, "zesOverclockGetControlCurrentValue");
   ze_result_t (*ctrlProp)(ze_handle, int32_t, ctrl_prop_t *) = (void *)GetProcAddress(z, "zesOverclockGetDomainControlProperties");
   ze_result_t (*freqCaps)(ze_handle, freq_oc_caps_t *) = (void *)GetProcAddress(z, "zesFrequencyOcGetCapabilities");
