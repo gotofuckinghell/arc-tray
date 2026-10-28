@@ -1,0 +1,19 @@
+ArcTray — third-party notices
+=============================
+
+1. Arc-Power (https://github.com/YamsSE/Arc-Power), GPL-2.0
+   The IGCL/Sysman structure layouts, the 115 C temperature route (bundled 2023
+   runtime) and the flat-table fan mechanism are ported from Arc-Power.
+   ArcTray is therefore distributed under GPL-2.0; see LICENSE.
+
+2. IntelControlLib-2023.dll
+   Intel IGCL runtime, © Intel Corporation. Redistributed unmodified as shipped
+   with the Arc-Power project (Intel Graphics Control Library). Provided as-is,
+   without any warranty; this tool is not affiliated with or endorsed by Intel.
+
+3. Intel Level Zero (ze_loader.dll) and the driver's IntelControlLib.dll are
+   used from the installed Intel graphics driver at runtime; they are not
+   redistributed here.
+
+4. This tool talks to undocumented/partially documented Intel interfaces.
+   Applying overclocks or power-limit changes is at your own risk.

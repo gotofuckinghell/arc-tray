@@ -1,0 +1,23 @@
+# build output
+arctray.exe
+probe.exe
+probe_sysman.exe
+probe_ext.exe
+arc.ico
+build.log
+out.txt
+
+# local state
+arctray.ini
+arctray.log
+*.log
+
+# Intel runtime, never redistributed from this repo
+vendor/
+IntelControlLib-2023.dll
+
+# scratch
+menu.png
+screen.png
+*.zip
+res/res.o
