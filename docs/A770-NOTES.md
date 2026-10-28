@@ -97,7 +97,10 @@ llama-bench SYCL, MiniCPM5-2B, -p 4096       277…282 W, 2532 MHz, 71 °C
   telemetry flags during the load:           gpuPowerLimited + gpuCurrentLimited
 ```
 
-`gpuPowerPercent` reports 0 (unsupported) on this driver.
+`gpuPowerPercent` reports 0 (unsupported) on this driver. The limit flags
+(`gpuPowerLimited`, `gpuCurrentLimited`) are **sticky**: after a heavy run they stay
+set at 39 W idle until the driver resets them, so read them only as "this reason has
+fired recently" and verify limits by watts, not by flags.
 
 Consequences:
 
