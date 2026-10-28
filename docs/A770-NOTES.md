@@ -111,6 +111,27 @@ Consequences:
   even with a 398 W request. The connector/VRM current limit binds first (2×8-pin +
   slot = 375 W on paper), so anything above ~300 W is a register value, not a target.
 
+## Is there a current-limit knob? No.
+
+The `CURRENT` limit flag cannot be raised on this card:
+
+- IGCL has no current control at all (the OC properties are power, temperature,
+  frequency offset, voltage offset, VRAM speed, VF curve).
+- Level Zero Sysman defines `ZES_OVERCLOCK_CONTROL_ICCMAX_LIMIT` (bit 256) in its
+  overclock-domain API, but on driver 32.0.101.9150 the whole API is dead:
+  `zesDeviceGetOverclockDomains` and `zesDeviceEnumOverclockDomains` return
+  `0x78000003`, `AvailableControls = 0`, and `zesFrequencyOcGetCapabilities` reports
+  `isIccMaxSupported = 0`.
+- The peak limits are not the constraint either: `zesPowerGetLimits` reports
+  `powerAC = powerDC = 800000 mW` by default. Writing a lower value is accepted, a
+  higher one changes nothing — 800 W is the ceiling, and the card stops at ~280 W long
+  before it.
+
+So the ~289 W peak is a hardware OCP/VRM limit. The only ways around it are
+vBIOS-level (signed, no mods on this SKU) or a shunt mod, which does not apply to the
+A770 — the card measures current through the MPS/MP2979 controller plus PL4, not
+through a shunt resistor.
+
 ## Sysman capability block (this card)
 
 ```
