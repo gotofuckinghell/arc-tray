@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- `--watch[=sec]`: real board power in watts from the IGCL energy counter (which
+  turns out to be a double in joules, not a u64 counter). Used to verify power limits
+  without external tools.
+- docs: measured idle 39.5 W and 277…282 W under a llama.cpp SYCL load with the
+  `POWER` + `CURRENT` limit flags; FurMark/Superposition are not valid power tests on
+  this card, and ~280 W is the current-limited ceiling.
+
 ## 1.1.0
 
 - Tray menu with profiles, power limit, core offset, voltage offset, temperature

@@ -85,6 +85,29 @@ Repeated reads of `ctlOverclockGpuFrequencyOffsetGetV2` after setting +75 MHz re
 moving base). Menu checkmarks therefore match the *nearest* step of the grid
 (±12 MHz) instead of an exact value.
 
+## Measuring real board power
+
+IGCL has no watts field. `totalCardEnergyCounter` (and `gpuEnergyCounter`) is a
+**double in joules** — decoding the union as u64 yields garbage, as double it gives
+sane numbers. Power = delta / delta_t:
+
+```
+idle (600 MHz, fan 0)                       39.5 W
+llama-bench SYCL, MiniCPM5-2B, -p 4096       277…282 W, 2532 MHz, 71 °C
+  telemetry flags during the load:           gpuPowerLimited + gpuCurrentLimited
+```
+
+`gpuPowerPercent` reports 0 (unsupported) on this driver.
+
+Consequences:
+
+- FurMark and Superposition only reach 160–180 W here — they do not saturate Xe, so
+  they are useless as power-limit tests on this card. A compute load (llama.cpp SYCL,
+  hashcat, OCCT "Power", 3DMark Speed Way / Steel Nomad stress) does.
+- The card stops at ~280 W with the **current** limit flag, not the power-limit flag,
+  even with a 398 W request. The connector/VRM current limit binds first (2×8-pin +
+  slot = 375 W on paper), so anything above ~300 W is a register value, not a target.
+
 ## Sysman capability block (this card)
 
 ```

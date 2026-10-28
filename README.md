@@ -74,6 +74,7 @@ arctray.exe --set fan=auto
 arctray.exe --set volt=50               voltage offset, mV (positive only)
 arctray.exe --profile=Gaming            apply an ini profile
 arctray.exe --autostart=on|off|status   logon task
+arctray.exe --watch[=sec]               real board power (W) from the IGCL energy counter
 arctray.exe --selftest                  OS build, driver, which IGCL/Sysman symbols exist
 arctray.exe --caps                      Sysman V/F capabilities and current targets
 arctray.exe --about                     version, attribution, links
@@ -129,6 +130,23 @@ The tool has to survive older Intel stacks (the Windows 10 branch in particular)
 
 Debug switches: `ARCTRAY_NO_SYSMAN=1`, `ARCTRAY_V1=1`, `ARCTRAY_PROPS_VERSION=1`.
 DLL-path overrides are ignored in an elevated process by design (see SECURITY.md).
+
+## Measuring a power limit
+
+`arctray.exe --watch=20` prints board power 0.5 s apart, derived from the IGCL energy
+counter (the counter is a **double in joules**; `gpuPowerPercent` is unsupported on
+this stack). Measured on the A770 with a 398 W limit:
+
+```
+idle               39.5 W
+llama-bench (SYCL, MiniCPM5-2B, -p 4096)   277…282 W, 2532 MHz, 71 °C, flags POWER CURRENT
+```
+
+So a real compute load does exceed the 160–180 W that FurMark and Superposition reach —
+those two do not saturate Xe. The card stops at ~280 W with the **current** limit flag
+set, which means the VRM/connector current limit binds before the 398 W register value
+ever matters (2×8-pin + slot is 375 W on paper). Treat >300 W as unreachable on this
+board rather than as a target.
 
 ## Status
 

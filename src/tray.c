@@ -188,7 +188,7 @@ static void apply_profile(HWND hwnd, const Profile *p) {
   show_result(hwnd, ok, all);
 }
 
-#define APP_VERSION L"1.1.0"
+#define APP_VERSION L"1.2.0"
 #define URL_GITHUB L"https://github.com/gotofuckinghell"
 #define URL_GITLAB L"https://gitlab.com/grubyrams"
 #define URL_TELEGRAM L"https://t.me/hwretard"
@@ -578,6 +578,58 @@ static void print_selftest(void) {
   printf("ext runtime: %s\n", arc_ext_available(&g_arc) ? "loaded (115 C path)" : "missing");
 }
 
+static double now_s(void) {
+  LARGE_INTEGER f, c;
+  QueryPerformanceFrequency(&f);
+  QueryPerformanceCounter(&c);
+  return (double)c.QuadPart / (double)f.QuadPart;
+}
+
+static int sample_energy(ArcDev *a, double *energy, ctl_power_telemetry_v2_t *t) {
+  if (!a->ctlPowerTelemetryGetV2) return 0;
+  memset(t, 0, sizeof *t);
+  t->Size = sizeof *t; t->Version = 2;
+  if (a->ctlPowerTelemetryGetV2(a->dev, t) != 0) return 0;
+  const ctl_oc_telemetry_item_t *item = t->totalCardEnergyCounter.bSupported ? &t->totalCardEnergyCounter
+                                                                           : &t->gpuEnergyCounter;
+  if (!item->bSupported) return 0;
+  *energy = item->value; // IGCL reports the energy counter as a DOUBLE in joules
+  return 1;
+}
+
+// --watch: derive real board power from the energy counter (IGCL does not expose watts)
+static void print_watch(ArcDev *a, int seconds) {
+  ctl_power_telemetry_v2_t t;
+  double e0 = 0, e1 = 0;
+  double t0 = now_s();
+  if (!sample_energy(a, &e0, &t)) { printf("no energy counter on this stack\n"); return; }
+  int first = 1;
+  printf("time   watts    clock   temp  pct  limit\n");
+  double start = now_s();
+  while (now_s() - start < seconds) {
+    Sleep(500);
+    if (!sample_energy(a, &e1, &t)) { printf("energy read stopped\n"); return; }
+    double t1 = now_s();
+    double dt = t1 - t0;
+    if (dt <= 0) continue;
+    double de = e1 - e0;
+    if (de < 0) de = 0;
+    double watts = de / dt;
+    (void)first;
+    printf("%5.1f  %7.1f  %5.0f   %4.0f  %3.0f  %s%s%s\n",
+           t1 - start, watts,
+           t.gpuCurrentClockFrequency.bSupported ? t.gpuCurrentClockFrequency.value : 0,
+           t.gpuCurrentTemperature.bSupported ? t.gpuCurrentTemperature.value : 0,
+           t.gpuPowerPercent.bSupported ? t.gpuPowerPercent.value : 0,
+           t.gpuPowerLimited ? "POWER " : "",
+           t.gpuTemperatureLimited ? "TEMP " : "",
+           t.gpuCurrentLimited ? "CURRENT" : "");
+    fflush(stdout);
+    e0 = e1;
+    t0 = t1;
+  }
+}
+
 static void print_caps(void) {
   if (!g_arc.freq) { printf("no sysman frequency domain\n"); return; }
   printf("freq handle=%p\n", g_arc.freq);
@@ -652,6 +704,13 @@ int main(int argc, char **argv) {
   if (!strcmp(argv[1], "--state")) { print_state(); arc_close(&g_arc); return 0; }
   if (!strcmp(argv[1], "--caps")) { print_caps(); arc_close(&g_arc); return 0; }
   if (!strcmp(argv[1], "--selftest")) { print_selftest(); arc_close(&g_arc); return 0; }
+  if (!strncmp(argv[1], "--watch", 7)) {
+    int secs = 10;
+    if (argv[1][7] == '=') secs = atoi(argv[1] + 8);
+    print_watch(&g_arc, secs);
+    arc_close(&g_arc);
+    return 0;
+  }
   if (!strcmp(argv[1], "--about")) {
     printf("ArcTray %ls\n", APP_VERSION);
     printf("Headless Intel Arc tuner: tray menu, no Electron, no window.\n");
