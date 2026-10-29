@@ -205,7 +205,8 @@ static void apply_profile(HWND hwnd, const Profile *p) {
   show_result(hwnd, ok, all);
 }
 
-#define APP_VERSION L"1.3.0"
+#include "version.h"
+#define APP_VERSION L"" ARCTRAY_STR(ARCTRAY_VERSION_MAJOR) L"." ARCTRAY_STR(ARCTRAY_VERSION_MINOR) L"." ARCTRAY_STR(ARCTRAY_VERSION_PATCH)
 #define URL_GITHUB L"https://github.com/gotofuckinghell"
 #define URL_GITLAB L"https://gitlab.com/grubyrams"
 #define URL_TELEGRAM L"https://t.me/hwretard"

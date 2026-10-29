@@ -103,6 +103,13 @@ Requires an x64 mingw-w64 gcc (Strawberry Perl ships one as
 bash build.sh        # -> arctray.exe + arc.ico
 ```
 
+## Versioning
+
+SemVer 2.0.0: `MAJOR` for breaking changes (menu/CLI/config), `MINOR` for new features,
+`PATCH` for fixes. The number lives in `src/version.h`, the binary prints it from there
+(`--about`), releases are tagged `vX.Y.Z`, and every tag has a matching
+[CHANGELOG](CHANGELOG.md) entry.
+
 ## How it works
 
 - `src/arc.h` — IGCL and Level Zero Sysman structure layouts, each with a

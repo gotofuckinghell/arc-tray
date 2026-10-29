@@ -1,5 +1,33 @@
 # Changelog
 
+All notable changes are recorded here. The project follows
+[Semantic Versioning 2.0.0](https://semver.org/):
+
+- **MAJOR** — breaks how the tool is used (menu layout, CLI flags, config format) or
+  drops a supported driver generation.
+- **MINOR** — backwards-compatible functionality (a new menu block, CLI command, tweak).
+- **PATCH** — fixes and documentation only.
+
+Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
+truth for the number the binary reports.
+
+## 1.3.0
+
+- **Tweaks (latency)** menu block and `--tweaks` / `--tweak=<id>:on|off|revert`:
+  HAGS, MPO workaround, Game DVR, fullscreen optimizations, MMCSS Games priority,
+  MMCSS system responsiveness, network throttling, global timer resolution,
+  Win32PrioritySeparation. Each entry has a one-line description in the menu, a full
+  text in the balloon and the help dialog, and every write is read back.
+- About became a submenu: About dialog plus GitHub / GitLab / Telegram links.
+- `src/version.h`: single source of truth for the SemVer version.
+
+## 1.2.1
+
+- Tray icon fix: `Shell_NotifyIcon` is retried when Explorer is not ready (the logon
+  task used to lose the icon with `E_FAIL`), the window is a hidden top-level popup so
+  the `TaskbarCreated` broadcast arrives, and the icon is re-registered after an
+  Explorer restart.
+
 ## 1.2.0
 
 - `--watch[=sec]`: real board power in watts from the IGCL energy counter (which
