@@ -57,7 +57,8 @@ static int find_igcl_dll(char *out, size_t cap) {
     do {
       if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
       char cand[MAX_PATH];
-      snprintf(cand, sizeof cand, "%s\\%s\\IntelControlLib.dll", root, fd.cFileName);
+      int w = snprintf(cand, sizeof cand, "%s\\%s\\IntelControlLib.dll", root, fd.cFileName);
+      if (w < 0 || w >= (int)sizeof cand) continue;   // longer than MAX_PATH cannot be opened
       if (GetFileAttributesA(cand) != INVALID_FILE_ATTRIBUTES) { snprintf(out, cap, "%s", cand); found = 1; break; }
     } while (FindNextFileA(h, &fd));
     FindClose(h);

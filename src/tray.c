@@ -21,7 +21,6 @@ static ArcState g_state;
 static Profile g_prof[16];
 static int g_profc = 0;
 static char g_ini[MAX_PATH];
-static int g_core_mode = 0; // A770: offsets 0..300
 
 static void logf_(const char *fmt, ...) {
   char path[MAX_PATH];
@@ -66,6 +65,7 @@ static void ini_path(char *out, size_t cap) {
   snprintf(out, cap, "%s\\ArcTray", appdata);
   CreateDirectoryA(out, NULL);
   size_t n = strlen(out);
+  if (n + 12 >= cap) return;                 // "<dir>\arctray.ini" must fit
   snprintf(out + n, cap - n, "\\arctray.ini");
 }
 
@@ -302,8 +302,17 @@ static int gfx_snap_path(char *out, size_t n, const char *file) {
   if (file && *file) { snprintf(out, n, "%s", file); return 1; }
   const char *base = getenv("APPDATA");
   if (!base || !*base) return 0;
-  snprintf(out, n, "%s\\ArcTray\\gfx-snapshot.ini", base);
-  return 1;
+  char dir[MAX_PATH];
+  int w = snprintf(dir, sizeof dir, "%s\\ArcTray", base);
+  if (w < 0 || w >= (int)sizeof dir) return 0;
+  DWORD attr = GetFileAttributesA(dir);
+  if (attr == INVALID_FILE_ATTRIBUTES) {
+    if (!CreateDirectoryA(dir, NULL)) return 0;
+  } else if (attr & FILE_ATTRIBUTE_REPARSE_POINT) {
+    return 0;                     // never write a config through a junction/symlink
+  }
+  w = snprintf(out, n, "%s\\gfx-snapshot.ini", dir);
+  return w > 0 && w < (int)n;
 }
 
 static int gfx_save(const char *path) {
@@ -358,7 +367,23 @@ static void watch_stamp(char *out, size_t n) {
 static int gfx_watch_path(char *out, size_t n) {
   const char *base = getenv("APPDATA");
   if (!base || !*base) return 0;
-  snprintf(out, n, "%s\\ArcTray\\gfx-watch.log", base);
+  char dir[MAX_PATH];
+  int w = snprintf(dir, sizeof dir, "%s\\ArcTray", base);
+  if (w < 0 || w >= (int)sizeof dir) return 0;
+  DWORD attr = GetFileAttributesA(dir);
+  if (attr == INVALID_FILE_ATTRIBUTES) {
+    if (!CreateDirectoryA(dir, NULL)) return 0;
+  } else if (attr & FILE_ATTRIBUTE_REPARSE_POINT) {
+    return 0;
+  }
+  w = snprintf(out, n, "%s\\gfx-watch.log", dir);
+  if (w < 0 || w >= (int)n) return 0;
+  WIN32_FILE_ATTRIBUTE_DATA fa;
+  if (GetFileAttributesExA(out, GetFileExInfoStandard, &fa) && fa.nFileSizeLow > (1u << 20)) {
+    char old[MAX_PATH];
+    if (snprintf(old, sizeof old, "%s.1", out) > 0 && (int)strlen(old) < (int)sizeof old)
+      MoveFileExA(out, old, MOVEFILE_REPLACE_EXISTING);
+  }
   return 1;
 }
 
@@ -444,8 +469,8 @@ static HMENU build_menu(void) {
   if (g_profc > 0) {
     HMENU prof = CreatePopupMenu();
     for (int i = 0; i < g_profc; i++) {
-      wchar_t label[128];
-      swprintf(label, 128, L"%S  —  %d W, %+d MHz, %d\x00B0""C", g_prof[i].name, g_prof[i].pl, g_prof[i].core, g_prof[i].temp);
+      wchar_t label[192];
+      swprintf(label, 192, L"%S  —  %d W, %+d MHz, %d\x00B0""C", g_prof[i].name, g_prof[i].pl, g_prof[i].core, g_prof[i].temp);
       AppendMenuW(prof, MF_STRING, 1000 + i, label);
     }
     AppendMenuW(root, MF_POPUP, (UINT_PTR)prof, L"Profiles");

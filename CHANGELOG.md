@@ -11,6 +11,23 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.7.1
+
+Code-review pass over `gfx.c`, `arc.c`, `tray.c` (gcc `-fanalyzer` + manual read):
+
+- `gfx_caps`: the details array is 64 slots but the count came straight from the
+  driver — a stack advertising more features would have had it write past the buffer.
+  The request is now clamped to 64 and a driver that refuses the smaller request is
+  treated as "no features" instead of reading uninitialised memory.
+- Snapshot and watcher paths: the `%APPDATA%\ArcTray` folder is created when missing
+  (saving used to fail silently on a fresh profile) and both refuse to write through a
+  junction/reparse point.
+- `--gfx-watch` rotates the log at 1 MB (`gfx-watch.log.1`), so a multi-day run cannot
+  grow without bound.
+- `ini_path`: bounds check before appending `\arctray.ini` (size_t underflow when the
+  directory path filled the buffer); profile menu labels widened to 192 chars;
+  `find_dll` skips candidates longer than `MAX_PATH`; unused `g_core_mode` removed.
+
 ## 1.7.0
 
 - `--gfx-watch[=seconds]`: polls every supported 3D feature and appends a timestamped

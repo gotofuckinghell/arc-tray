@@ -59,9 +59,14 @@ int gfx_caps(ArcDev *a, GfxFeature *out, int max) {
   memset(buf, 0, sizeof buf);
   caps_t fill; memset(&fill, 0, sizeof fill);
   fill.Size = sizeof fill; fill.Version = 0;
-  fill.NumSupportedFeatures = c.NumSupportedFeatures;
+  // The driver fills as many detail slots as it reports; a future stack with more
+  // than 64 features must not be allowed to write past buf.
+  const uint32_t room = (uint32_t)(sizeof buf / sizeof buf[0]);
+  const uint32_t want = c.NumSupportedFeatures > room ? room : c.NumSupportedFeatures;
+  fill.NumSupportedFeatures = want;
   fill.pFeatureDetails = buf;
   if (caps(a->dev, &fill) != 0) return 0;
+  if (fill.NumSupportedFeatures < want) return 0;   // driver refused the smaller request
 
   int n = 0;
   for (uint32_t i = 0; i < fill.NumSupportedFeatures && n < max; i++) {
