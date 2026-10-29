@@ -21,7 +21,7 @@ exploits in a public issue before a fix is available.
 Scope: `src/tray.c`, `src/arc.c`, `src/gfx.c`, `src/tweaks.c`, build flags, deployment
 ACLs, git history. Result: 4 fixes, 3 informational items, no network/IPC surface
 (`WSAStartup|socket|WinHttp|InternetOpen|URLDownload` → 0 hits), no secrets in history
-(`ghp_|glpat-|api_key|password` → 0 hits).
+(`ghp_…|-style token patterns and `api_key`/`password` literals → 0 hits).
 
 ### F2 — unsigned third-party runtime loaded into an elevated process (fixed)
 

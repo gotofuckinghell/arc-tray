@@ -906,6 +906,14 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 static int run_tray(HINSTANCE inst) {
   logf_("run_tray start");
+  // One tray per session: a second instance would race the logon task, duplicate the
+  // icon and hold a second IGCL client for no reason.
+  HANDLE once = CreateMutexW(NULL, FALSE, L"Local\\ArcTray.Tray.SingleInstance");
+  if (once && GetLastError() == ERROR_ALREADY_EXISTS) {
+    logf_("another tray instance is already running, exiting");
+    CloseHandle(once);
+    return 0;
+  }
   load_ini();
 
   WNDCLASSW wc;

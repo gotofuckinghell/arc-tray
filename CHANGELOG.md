@@ -11,6 +11,15 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.8.1
+
+- Documentation: rewritten `README.md`, new `docs/ARCHITECTURE.md` (layers, init sequence,
+  3D-feature union layouts, files, testing) and `docs/CLI.md` (every flag, ranges, exit
+  codes, environment switches).
+- Tray is single-instance (`Local\ArcTray.Tray.SingleInstance`); a second copy exits
+  quietly instead of duplicating the icon and racing the logon task.
+- Repository hygiene: tracked probe binaries removed, `.gitignore` covers build output.
+
 ## 1.8.0
 
 Security audit of the whole tool (see `SECURITY.md`, "Audit 2026-10-29"):
