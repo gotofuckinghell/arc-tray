@@ -180,11 +180,17 @@ Driver quirks that shaped the code: [docs/A770-NOTES.md](docs/A770-NOTES.md).
 
 ## Versioning
 
-**Pre-1.0 (`0.0.N`)**: the menu, CLI and config format are still moving, so there is no
-stable release yet and every change bumps the patch number. `1.0.0` will be tagged once the
-interface is frozen. The number lives in `src/version.h`, the binary prints it (`--about`),
-releases are tagged `vX.Y.Z`, and every tag has a matching [CHANGELOG](CHANGELOG.md) entry.
-(The old `1.x` tags from 2026-10-29 remain in history; numbering restarted at `0.0.1`.)
+**Pre-1.0, `0.0.<base><quarters>`**: the menu, CLI and config format are still moving, so
+there is no stable release. The counter works as requested:
+
+* `base` — three digits, **+1 for every added option**;
+* `quarters` — two digits appended only when non-zero: `25` / `50` / `75`,
+  because **one fixed bug adds 0.25** (four bugs = one feature step).
+
+So `0.0.004` = four features, `0.0.00425` = plus one bug fix. The number lives in
+`src/version.h`, the binary prints it (`--about`), releases are tagged `v0.0.<base><quarters>`,
+and every tag has a matching [CHANGELOG](CHANGELOG.md) entry. `1.0.0` is reserved for a
+frozen interface; the old `1.x` tags stay in history.
 
 ## Robustness across driver branches
 

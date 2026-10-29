@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.00125
+
+Versioning switched to the requested scheme: `0.0.<base><quarters>`, where `base` grows by
+one per added option and a fixed bug appends `25` / `50` / `75` (0.25 each). This release
+carries over `0.0.1` (the data-loss fix for bit-step tweaks) and bumps the quarter counter
+for the scheme change itself.
+
 ## 0.0.1
 
 Versioning restart: the project is pre-1.0 and stays at `0.0.N` until the menu/CLI/config
