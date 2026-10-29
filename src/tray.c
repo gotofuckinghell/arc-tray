@@ -205,7 +205,7 @@ static void apply_profile(HWND hwnd, const Profile *p) {
   show_result(hwnd, ok, all);
 }
 
-#define APP_VERSION L"1.2.1"
+#define APP_VERSION L"1.3.0"
 #define URL_GITHUB L"https://github.com/gotofuckinghell"
 #define URL_GITLAB L"https://gitlab.com/grubyrams"
 #define URL_TELEGRAM L"https://t.me/hwretard"
@@ -386,7 +386,9 @@ static HMENU build_menu(void) {
     const TweakDef *td = tweak_at(i);
     int st = tweak_state(td);
     UINT flags = MF_STRING | (st == 1 ? MF_CHECKED : 0);
-    AppendMenuW(tw, flags, 7000 + i, td->name);
+    wchar_t label[192];
+    swprintf(label, 192, L"%s  —  %s", td->name, td->short_desc);
+    AppendMenuW(tw, flags, 7000 + i, label);
   }
   AppendMenuW(tw, MF_SEPARATOR, 0, NULL);
   AppendMenuW(tw, MF_STRING, 7100, L"Tweaks help...");
@@ -463,9 +465,9 @@ static void handle_cmd(HWND hwnd, int cmd) {
       for (int i = 0; i < tweaks_count() && off < 3600; i++) {
         const TweakDef *td = tweak_at(i);
         int st = tweak_state(td);
-        off += swprintf(text + off, 4000 - off, L"%s  [%s]%s\n%s\n\n",
-                        td->name, st == 1 ? L"ON" : st == 0 ? L"OFF" : L"mixed/absent",
-                        td->needs_reboot ? L"  (reboot)" : L"", td->desc);
+        off += swprintf(text + off, 4000 - off, L"%s  [%s]%s\n    %s\n    %s\n\n",
+                        td->name, st == 1 ? L"ON" : st == 0 ? L"OFF" : L"MIXED/absent",
+                        td->needs_reboot ? L"  (needs reboot)" : L"", td->short_desc, td->desc);
       }
       MessageBoxW(hwnd, text, L"ArcTray — tweaks", MB_OK | MB_ICONINFORMATION);
       break;

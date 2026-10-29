@@ -15,7 +15,8 @@ typedef struct {
 typedef struct {
   const wchar_t *id;
   const wchar_t *name;
-  const wchar_t *desc;    // shown in the balloon / help dialog
+  const wchar_t *short_desc; // one line, shown in the menu next to the name
+  const wchar_t *desc;       // full text for the balloon / help dialog
   int needs_reboot;
   int nsteps;
   TweakStep steps[TWEAK_MAX_STEPS];

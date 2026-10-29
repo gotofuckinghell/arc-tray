@@ -9,13 +9,13 @@
 
 static const TweakDef TWEAKS[] = {
   {
-    L"hags", L"Hardware-accelerated GPU scheduling",
+    L"hags", L"Hardware-accelerated GPU scheduling", L"lower latency, reboot",
     L"HwSchMode=2 lets the GPU scheduler own VRAM instead of the CPU driver thread. "
     L"Lower input latency on some systems, stutter on others. Needs a reboot to take effect.",
     1, 1, {{ L"HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers", L"HwSchMode", 0, 2, 1, NULL, NULL }}
   },
   {
-    L"mpo", L"Multiplane Overlay (MPO) workaround",
+    L"mpo", L"Multiplane Overlay (MPO) workaround", L"fix stutter / flicker / black screens",
     L"Legacy MPO workaround (MPOHack=1 + DWM OverlayTestMode=5). Fixes stutter, flicker and "
     L"black screens on some multi-monitor / windowed setups. Experimental; a reboot helps.",
     0, 3, {
@@ -25,7 +25,7 @@ static const TweakDef TWEAKS[] = {
     }
   },
   {
-    L"gamedvr", L"Game DVR / background recording",
+    L"gamedvr", L"Game DVR / background recording", L"stop background recording",
     L"Turns Game Bar background recording off machine-wide (GameDVR_Enabled=0 + AllowGameDVR=0). "
     L"Costs a few percent of FPS and adds capture overhead when left on.",
     0, 2, {
@@ -34,13 +34,13 @@ static const TweakDef TWEAKS[] = {
     }
   },
   {
-    L"fso", L"Fullscreen optimizations (global default)",
+    L"fso", L"Fullscreen optimizations (global default)", L"true exclusive fullscreen",
     L"GameDVR_FSEBehaviorMode=2 makes games use true exclusive fullscreen instead of the "
     L"fullscreen-optimization flip path. Lower latency in some titles, worse alt-tab in others.",
     0, 1, {{ L"HKCU\\System\\GameConfigStore", L"GameDVR_FSEBehaviorMode", 0, 2, 0, NULL, NULL }}
   },
   {
-    L"mmcss-games", L"MMCSS \"Games\" task priority",
+    L"mmcss-games", L"MMCSS \"Games\" task priority", L"high priority while a game runs",
     L"Raises the multimedia scheduler class used while a game runs: GPU Priority=8, "
     L"Priority=6, Scheduling Category=High, SFIO Priority=High. Applies to newly started games.",
     0, 4, {
@@ -51,25 +51,25 @@ static const TweakDef TWEAKS[] = {
     }
   },
   {
-    L"system-responsiveness", L"MMCSS system responsiveness (0%)",
+    L"system-responsiveness", L"MMCSS system responsiveness (0%)", L"no 20% CPU reserve",
     L"SystemResponsiveness=0 stops the multimedia service from reserving 20% of the CPU for "
     L"itself, so games get the full budget. Can make background audio glitchy on weak CPUs.",
     0, 1, {{ MMCSS, L"SystemResponsiveness", 0, 0, 20, NULL, NULL }}
   },
   {
-    L"net-throttling", L"Network throttling limit off",
+    L"net-throttling", L"Network throttling limit off", L"no multimedia network throttling",
     L"NetworkThrottlingIndex=0xFFFFFFFF disables the 10-packets-per-ms multimedia throttle "
     L"that Windows applies while audio/video plays — removes a known network latency spike.",
     0, 1, {{ MMCSS, L"NetworkThrottlingIndex", 0, 0xFFFFFFFF, 10, NULL, NULL }}
   },
   {
-    L"timer-resolution", L"Global high-resolution timers",
+    L"timer-resolution", L"Global high-resolution timers", L"0.5 ms timers, reboot",
     L"GlobalTimerResolutionRequests=1 lets a process request 0.5 ms timers globally instead of "
     L"being rounded up to the 15.6 ms tick. Needs a reboot; costs a little idle power.",
     1, 1, {{ HKLM_SYS L"\\Control\\Session Manager\\kernel", L"GlobalTimerResolutionRequests", 0, 1, 0, NULL, NULL }}
   },
   {
-    L"win32-priority", L"Win32PrioritySeparation (foreground boost)",
+    L"win32-priority", L"Win32PrioritySeparation (foreground boost)", L"foreground quantum boost, reboot",
     L"Win32PrioritySeparation=0x26 gives the foreground thread quantum more weight than the "
     L"Windows default (0x2). Classic responsiveness tweak; a reboot is recommended.",
     1, 1, {{ HKLM_SYS L"\\Control\\PriorityControl", L"Win32PrioritySeparation", 0, 0x26, 2, NULL, NULL }}
