@@ -45,8 +45,22 @@ int main(void) {
     printf("vram speed get: r=0x%08x (%s) value=%g\n", gr, arc_result_name(gr), v);
   }
 
+  typedef ctl_result_t (*fn_vf)(void *, int32_t, int32_t, uint32_t *, void *);
   sym = (void *)GetProcAddress(a.igcl, "ctlOverclockReadVFCurve");
   printf("ctlOverclockReadVFCurve resolved: %s\n", sym ? "yes" : "no");
+  if (sym) {
+    fn_vf vf = NULL;
+    memcpy(&vf, &sym, sizeof vf);
+    static const struct { int type; int detail; const char *label; } q[] = {
+      {0, 0, "stock/simplified"}, {1, 0, "live/simplified"},
+      {1, 1, "live/medium"},      {1, 2, "live/elaborate"},
+    };
+    for (unsigned i = 0; i < sizeof q / sizeof q[0]; i++) {
+      uint32_t n = 0;                       // 0 = "tell me how many points you have"
+      ctl_result_t vr = vf(a.dev, q[i].type, q[i].detail, &n, NULL);
+      printf("  vf %-16s r=0x%08x (%s) points=%u\n", q[i].label, vr, arc_result_name(vr), n);
+    }
+  }
 
   arc_close(&a);
   return 0;

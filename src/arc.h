@@ -132,7 +132,7 @@ typedef struct {
   ctl_result_t (*ctlFanGetConfig)(void *, ctl_fan_config_t *);
   ctl_result_t (*ctlFanGetState)(void *, int32_t, int32_t *);
   ctl_result_t (*ctlFanSetFixedSpeedMode)(void *, ctl_fan_speed_t *);
-  ctl_result_t (*ctlFanSetSpeedTableMode)(void *, ctl_fan_speed_t *);
+  ctl_result_t (*ctlFanSetSpeedTableMode)(void *, ctl_fan_speed_table_t *);
   ctl_result_t (*ctlFanSetDefaultMode)(void *);
   ctl_result_t (*ctlPowerTelemetryGetV2)(void *, ctl_power_telemetry_v2_t *);
   ctl_result_t (*ctlPowerTelemetryGet)(void *, ctl_power_telemetry_t *);

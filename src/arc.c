@@ -114,6 +114,13 @@ static int is_elevated(void) {
 #define BIND_IGCL(name, type) \
   do { a->name = (type)GetProcAddress(a->igcl, #name); } while (0)
 
+static void arc_partial_cleanup(ArcDev *a) {
+  if (a->api && a->ctlClose) a->ctlClose(a->api);
+  a->api = NULL;
+  if (a->igcl) FreeLibrary(a->igcl);
+  a->igcl = NULL;
+}
+
 int arc_open(ArcDev *a, char *err, size_t errcap) {
   memset(a, 0, sizeof *a);
   a->elevated = is_elevated();
@@ -145,7 +152,7 @@ int arc_open(ArcDev *a, char *err, size_t errcap) {
   BIND_IGCL(ctlFanGetConfig, ctl_result_t(*)(void *, ctl_fan_config_t *));
   BIND_IGCL(ctlFanGetState, ctl_result_t(*)(void *, int32_t, int32_t *));
   BIND_IGCL(ctlFanSetFixedSpeedMode, ctl_result_t(*)(void *, ctl_fan_speed_t *));
-  BIND_IGCL(ctlFanSetSpeedTableMode, ctl_result_t(*)(void *, ctl_fan_speed_t *));
+  BIND_IGCL(ctlFanSetSpeedTableMode, ctl_result_t(*)(void *, ctl_fan_speed_table_t *));
   BIND_IGCL(ctlFanSetDefaultMode, ctl_result_t(*)(void *));
   BIND_IGCL(ctlPowerTelemetryGetV2, ctl_result_t(*)(void *, ctl_power_telemetry_v2_t *));
   BIND_IGCL(ctlPowerTelemetryGet, ctl_result_t(*)(void *, ctl_power_telemetry_t *));
@@ -180,12 +187,13 @@ int arc_open(ArcDev *a, char *err, size_t errcap) {
   }
   if (r != CTL_SUCCESS || !a->api) {
     snprintf(err, errcap, "ctlInit failed: 0x%08x %s", r, arc_result_name(r));
+    arc_partial_cleanup(a);
     return 0;
   }
 
   uint32_t count = 0;
   a->ctlEnumerateDevices(a->api, &count, NULL);
-  if (count == 0) { snprintf(err, errcap, "no IGCL devices"); return 0; }
+  if (count == 0) { snprintf(err, errcap, "no IGCL devices"); arc_partial_cleanup(a); return 0; }
   void *handles[8] = {0};
   if (count > 8) count = 8;
   a->ctlEnumerateDevices(a->api, &count, handles);
@@ -210,7 +218,7 @@ int arc_open(ArcDev *a, char *err, size_t errcap) {
     }
     if (a->dev) break;
   }
-  if (!a->dev) { snprintf(err, errcap, "no Intel graphics adapter in IGCL list"); return 0; }
+  if (!a->dev) { snprintf(err, errcap, "no Intel graphics adapter in IGCL list"); arc_partial_cleanup(a); return 0; }
 
   memset(&a->oc, 0, sizeof a->oc);
   a->oc_version = 0;
@@ -427,6 +435,10 @@ static int igcl_set_power(ArcDev *a, double watts, char *msg, size_t cap) {
 }
 
 int arc_set_power(ArcDev *a, double watts, char *msg, size_t cap) {
+  if (!isfinite(watts) || watts < 1.0 || watts > 600.0) {
+    snprintf(msg, cap, "power limit %.0f W outside 1..600", watts);
+    return 0;
+  }
   if (!a->elevated) { snprintf(msg, cap, "нужны права администратора"); return 0; }
   if (!a->pwr || !a->zesPowerGetLimits || !a->zesPowerSetLimits) return igcl_set_power(a, watts, msg, cap);
   zes_power_sustained_limit_t s; memset(&s, 0, sizeof s);
@@ -458,6 +470,7 @@ int arc_set_core(ArcDev *a, double mhz, char *msg, size_t cap) {
   double got = NAN;
   if (a->ctlOverclockGpuFrequencyOffsetGetV2) a->ctlOverclockGpuFrequencyOffsetGetV2(a->dev, &got);
   if (!isfinite(got) && a->ctlOverclockGpuFrequencyOffsetGet) a->ctlOverclockGpuFrequencyOffsetGet(a->dev, &got);
+  if (!isfinite(got)) { snprintf(msg, cap, "core %.0f MHz written, readback unavailable", mhz); return 0; }
   if (fabs(got - mhz) > 12.0) { snprintf(msg, cap, "readback %.0f MHz (asked %.0f)", got, mhz); return 0; }
   snprintf(msg, cap, "core %+.0f MHz ok%s", got, v1 ? " (V1)" : "");
   return 1;
@@ -497,7 +510,7 @@ static int fan_write_table(ArcDev *a, int percent, int *got_pct) {
     tbl.table[i].speed.units = 1; // PERCENT: the Arc table API's encoding
     tbl.table[i].speed.speed = percent;
   }
-  ctl_result_t r = a->ctlFanSetSpeedTableMode(a->fan, (ctl_fan_speed_t *)&tbl);
+  ctl_result_t r = a->ctlFanSetSpeedTableMode(a->fan, (ctl_fan_speed_table_t *)&tbl);
   if (r != CTL_SUCCESS) return (int)r;
   if (a->ctlFanGetConfig) {
     ctl_fan_config_t cfg;
@@ -573,7 +586,6 @@ static int find_ext_dll(ArcDev *a, char *out, size_t cap) {
 
 int arc_ext_available(ArcDev *a) {
   if (a->ext_ready) return a->ext_dev != NULL;
-  a->ext_ready = 1;
   char dll[MAX_PATH];
   if (!find_ext_dll(a, dll, sizeof dll)) return 0;
   char hash[65] = {0};
@@ -631,6 +643,7 @@ int arc_ext_available(ArcDev *a) {
   if (!dev) { if (cls) cls(api); FreeLibrary(h); return 0; }
   if (waiver) { ctl_result_t wr = waiver(dev); if (wr != CTL_SUCCESS && wr != 0x44000007) { if (cls) cls(api); FreeLibrary(h); return 0; } }
   a->ext = h; a->ext_api = api; a->ext_dev = dev;
+  a->ext_ready = 1;                 /* cached only after a real successful probe */
   a->ext_set_temp = sett; a->ext_get_temp = gett; a->ext_close = cls;
   return 1;
 }
@@ -662,6 +675,8 @@ static double ze_scale_of(ArcDev *a) {
 }
 
 int arc_set_volt(ArcDev *a, int mv, char *msg, size_t cap) {
+  if (mv < 0) mv = 0;              // negative offsets need the Sysman V/F pair (see below)
+  if (mv > 500) mv = 500;
   if (!a->elevated) { snprintf(msg, cap, "admin rights required"); return 0; }
   if (!ensure_waiver(a, msg, cap)) return 0;
   const char *envs = getenv("ARCTRAY_VOLT_SYSMAN");

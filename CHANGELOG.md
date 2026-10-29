@@ -11,6 +11,34 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.8.2
+
+Static audit (OpenCode `--agent plan` over `tray.c`/`arc.c`/`gfx.c`/`tweaks.c`, plus manual
+triage of every claim). Confirmed and fixed:
+
+- `arc_set_core` reported `ok` when the read-back failed (`NaN`): the comparison was false
+  and the message printed `nan`. It now fails with `readback unavailable`.
+- `arc_open` leaked the IGCL client and the loaded DLL on every failure after `ctlInit`
+  (no devices, no Intel adapter). One cleanup helper now runs on those paths.
+- `arc_set_power` clamps to 1…600 W before `lround(watts * 1000)`; `arc_set_volt` clamps
+  the requested offset to 0…500 mV before the branch that writes it.
+- `arc_ext_available` cached "extended runtime unavailable" *before* the probe, so one
+  transient failure disabled the >90 °C route for the whole process. The flag is set only
+  after a successful probe.
+- `ctlFanSetSpeedTableMode` was bound as `ctl_fan_speed_t *` and called through a cast;
+  the prototype now matches IGCL (`ctl_fan_speed_table_t *`).
+- `gfx`: reading a BOOL feature produced an uninitialised `value`, and a FLOAT feature
+  would have been read as an integer; the union accessor now branches per value type. The
+  empty application name gets a 2-byte buffer so `Length = 1` always has a NUL.
+- `--profile=` skipped the voltage offset and always used the ≤90 °C setter, so a profile
+  with `temp=110` silently applied 90. It now mirrors the menu path (ext route + volts).
+- `GetTickCount` wraparound in the autostart cache (`(DWORD)` subtraction).
+
+Rejected after checking the code (reported as findings, not real): `KEY_WOW64_64KEY`
+(the build is x64, no Wow6432Node), "INT features leave the value uninitialised" (the
+INT layout does carry `Value`), and the hard-coded `stype = 0x1c` — unverified against the
+Level Zero headers, left as is.
+
 ## 1.8.1
 
 - Documentation: rewritten `README.md`, new `docs/ARCHITECTURE.md` (layers, init sequence,

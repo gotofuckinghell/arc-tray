@@ -265,7 +265,7 @@ static int run_wait(const wchar_t *exe, wchar_t *cmd, DWORD *code) {
 // The logon task is the honest source of truth: it exists -> autostart is on.
 static int autostart_enabled(void) {
   DWORD now = GetTickCount();
-  if (g_task_state >= 0 && now - g_task_checked < 20000) return g_task_state;
+  if (g_task_state >= 0 && (DWORD)(now - g_task_checked) < 20000) return g_task_state;
   wchar_t cmd[512];
   swprintf(cmd, 512, L"schtasks.exe /Query /TN \"%s\"", TASK_NAME);
   DWORD ec = 1;
@@ -1262,7 +1262,12 @@ int main(int argc, char **argv) {
         int ok = 1;
         if (g_prof[i].pl > 0) { ok &= arc_set_power(&g_arc, g_prof[i].pl, msg, sizeof msg); printf("pl: %s\n", msg); }
         ok &= arc_set_core(&g_arc, g_prof[i].core, msg, sizeof msg); printf("core: %s\n", msg);
-        if (g_prof[i].temp > 0) { ok &= arc_set_temp(&g_arc, g_prof[i].temp, msg, sizeof msg); printf("temp: %s\n", msg); }
+        if (g_prof[i].volt_mv != 0) { ok &= arc_set_volt(&g_arc, g_prof[i].volt_mv, msg, sizeof msg); printf("volt: %s\n", msg); }
+        if (g_prof[i].temp > 0) {
+          int tok = (g_prof[i].temp > 90) ? arc_set_temp_ext(&g_arc, g_prof[i].temp, msg, sizeof msg)
+                                          : arc_set_temp(&g_arc, g_prof[i].temp, msg, sizeof msg);
+          ok &= tok; printf("temp: %s\n", msg);
+        }
         if (g_prof[i].fan != 0) {
           ok &= arc_set_fan(&g_arc, g_prof[i].fan < 0 ? 0 : 1, g_prof[i].fan < 0 ? 0 : g_prof[i].fan, msg, sizeof msg);
           printf("fan: %s\n", msg);

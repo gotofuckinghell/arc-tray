@@ -103,9 +103,21 @@ static void union_put(getset_t *g, int vtype, int enabled, unsigned value) {
 
 static void union_take(const getset_t *g, int vtype, int *enabled, unsigned *value) {
   const uint8_t *u = &g->Enable;
-  if (vtype == 4) { uint32_t t = 0; memcpy(&t, u, 4); if (value) *value = t; if (enabled) *enabled = t ? 1 : 0; return; }
+  if (vtype == 4) {                       // ENUM: one uint32 at the union start
+    uint32_t t = 0; memcpy(&t, u, 4);
+    if (value) *value = t;
+    if (enabled) *enabled = t ? 1 : 0;
+    return;
+  }
   if (enabled) *enabled = g->Enable ? 1 : 0;
-  if (value) *value = g->Value;
+  if (!value) return;
+  if (vtype == 0) { *value = 0; return; } // BOOL has no Value member at all
+  if (vtype == 1) {                       // FLOAT: {bool Enable; float Value;}
+    float f = 0; memcpy(&f, &g->Value, sizeof f);
+    *value = (f > 0) ? (unsigned)(f + 0.5f) : 0;
+    return;
+  }
+  *value = g->Value;                      // INT32 / UINT32
 }
 
 int gfx_get(ArcDev *a, int feature, int *enabled, unsigned *value) {
@@ -113,7 +125,7 @@ int gfx_get(ArcDev *a, int feature, int *enabled, unsigned *value) {
   int vtype = 0;
   if (!gets || !find_type(a, feature, &vtype, NULL)) return 0;
   getset_t g; memset(&g, 0, sizeof g);
-  static char empty[1] = {0};
+  static char empty[2] = {0};   /* room for the NUL even with Length = 1 */
   g.Size = sizeof g; g.Version = 0; g.FeatureType = feature;
   g.ApplicationName = empty; g.ApplicationNameLength = 1; g.bSet = 0; g.ValueType = vtype;
   if (gets(a->dev, &g) != 0) return 0;
@@ -126,7 +138,7 @@ int gfx_set(ArcDev *a, int feature, int enabled, unsigned value) {
   int vtype = 0;
   if (!gets || !find_type(a, feature, &vtype, NULL)) return 0;
   getset_t g; memset(&g, 0, sizeof g);
-  static char empty[1] = {0};
+  static char empty[2] = {0};   /* room for the NUL even with Length = 1 */
   g.Size = sizeof g; g.Version = 0; g.FeatureType = feature;
   g.ApplicationName = empty; g.ApplicationNameLength = 1; g.bSet = 1; g.ValueType = vtype;
   union_put(&g, vtype, enabled, value);
