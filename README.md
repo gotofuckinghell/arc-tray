@@ -180,9 +180,11 @@ Driver quirks that shaped the code: [docs/A770-NOTES.md](docs/A770-NOTES.md).
 
 ## Versioning
 
-SemVer 2.0.0: `MAJOR` for breaking changes (menu/CLI/config), `MINOR` for features, `PATCH`
-for fixes. The number lives in `src/version.h`, the binary prints it (`--about`), releases
-are tagged `vX.Y.Z`, and every tag has a matching [CHANGELOG](CHANGELOG.md) entry.
+**Pre-1.0 (`0.0.N`)**: the menu, CLI and config format are still moving, so there is no
+stable release yet and every change bumps the patch number. `1.0.0` will be tagged once the
+interface is frozen. The number lives in `src/version.h`, the binary prints it (`--about`),
+releases are tagged `vX.Y.Z`, and every tag has a matching [CHANGELOG](CHANGELOG.md) entry.
+(The old `1.x` tags from 2026-10-29 remain in history; numbering restarted at `0.0.1`.)
 
 ## Robustness across driver branches
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.1
+
+Versioning restart: the project is pre-1.0 and stays at `0.0.N` until the menu/CLI/config
+surface is frozen — the `1.x` numbering implied a stability that does not exist yet. The
+`1.x` tags stay in git history; this release re-tags the same tree (the data-loss fix for
+bit-step tweaks included) as `0.0.1`.
+
 All notable changes are recorded here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/):
 
