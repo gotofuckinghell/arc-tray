@@ -212,7 +212,7 @@ static int write_step(const TweakStep *s, int enable, wchar_t *err, size_t errca
   else if (wcsncmp(path, L"HKLM\\", 5) == 0) { root = HKEY_LOCAL_MACHINE; path += 5; }
 
   HKEY key = NULL;
-  LONG r = RegCreateKeyExW(root, path, 0, NULL, 0, KEY_SET_VALUE, NULL, &key, NULL);
+  LONG r = RegCreateKeyExW(root, path, 0, NULL, 0, KEY_SET_VALUE | KEY_QUERY_VALUE, NULL, &key, NULL);
   if (r != ERROR_SUCCESS) { swprintf(err, errcap, L"open failed (%ld): %s", r, path); return 0; }
   if (s->is_string) {
     const wchar_t *val = enable ? s->on_sz : s->off_sz;

@@ -11,6 +11,14 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.9.1
+
+- **Data-loss fix in the bit-step write path.** `write_step` opened the key with
+  `KEY_SET_VALUE` only, so the read-modify-write for a bit step (`dpst`) could not read the
+  current `FeatureTestControl` and wrote `0` instead of preserving the other bits. The key
+  is now opened with `KEY_SET_VALUE | KEY_QUERY_VALUE`, verified by re-reading
+  `FeatureTestControl = 0x1200` around a `dpst` revert.
+
 ## 1.9.0
 
 - **Five new registry tweaks from the driver research**: `async-flips`
