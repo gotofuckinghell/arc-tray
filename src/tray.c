@@ -3,6 +3,7 @@
 #include "arc.h"
 #include "tweaks.h"
 #include "gfx.h"
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -344,6 +345,83 @@ static int gfx_restore(const char *path) {
   fclose(fp);
   printf("restored %d, problems %d (%s)\n", done, bad, path);
   return bad == 0 && done > 0;
+}
+
+// ---- graphics change watcher (--gfx-watch[=seconds]) ------------------------
+static void watch_stamp(char *out, size_t n) {
+  time_t now = time(NULL);
+  struct tm lt;
+  localtime_s(&lt, &now);
+  strftime(out, n, "%Y-%m-%d %H:%M:%S", &lt);
+}
+
+static int gfx_watch_path(char *out, size_t n) {
+  const char *base = getenv("APPDATA");
+  if (!base || !*base) return 0;
+  snprintf(out, n, "%s\\ArcTray\\gfx-watch.log", base);
+  return 1;
+}
+
+typedef struct { int id; int valid; int en; unsigned v; } WatchPrev;
+
+static int gfx_watch_loop(int interval_s) {
+  char logp[MAX_PATH], ts[32];
+  if (!gfx_watch_path(logp, sizeof logp)) return 2;
+  FILE *log = fopen(logp, "a");
+  if (!log) { fprintf(stderr, "cannot open %s\n", logp); return 2; }
+
+  GfxFeature f[64];
+  int n = gfx_caps(&g_arc, f, 64);
+  if (n <= 0) { fprintf(stderr, "no gfx features\n"); fclose(log); return 1; }
+  WatchPrev prev[64];
+  memset(prev, 0, sizeof prev);
+
+  watch_stamp(ts, sizeof ts);
+  fprintf(log, "%s watch start: %d features, interval %d s\n", ts, n, interval_s);
+  for (int i = 0; i < n; i++) {
+    prev[i].id = f[i].id;
+    prev[i].valid = gfx_get(&g_arc, f[i].id, &prev[i].en, &prev[i].v);
+    fprintf(log, "%s   baseline %-14s enable=%d value=%u%s\n", ts, f[i].name,
+            prev[i].en, prev[i].v, prev[i].valid ? "" : "  (unreadable)");
+  }
+  fflush(log);
+  printf("watching %d features every %d s -> %s\n", n, interval_s, logp);
+
+  unsigned beats = 0;
+  for (;;) {
+    Sleep((DWORD)interval_s * 1000);
+    beats++;
+    for (int i = 0; i < n; i++) {
+      int en = -1; unsigned v = 0;
+      int ok = gfx_get(&g_arc, f[i].id, &en, &v);
+      if (!ok) {
+        if (prev[i].valid) {
+          watch_stamp(ts, sizeof ts);
+          fprintf(log, "%s %-14s now unreadable (was enable=%d value=%u)\n", ts, f[i].name, prev[i].en, prev[i].v);
+          prev[i].valid = 0;
+          fflush(log);
+        }
+        continue;
+      }
+      if (!prev[i].valid) {
+        watch_stamp(ts, sizeof ts);
+        fprintf(log, "%s %-14s became readable enable=%d value=%u\n", ts, f[i].name, en, v);
+      } else if (en != prev[i].en || v != prev[i].v) {
+        watch_stamp(ts, sizeof ts);
+        fprintf(log, "%s %-14s %d/%u -> %d/%u\n", ts, f[i].name, prev[i].en, prev[i].v, en, v);
+      } else {
+        continue;
+      }
+      prev[i].en = en; prev[i].v = v; prev[i].valid = 1;
+      fflush(log);
+    }
+    if (beats % 120 == 0) {           // ~1 h at 30 s
+      watch_stamp(ts, sizeof ts);
+      fprintf(log, "%s heartbeat (%u polls)\n", ts, beats);
+      fflush(log);
+    }
+  }
+  return 0;
 }
 
 static HMENU build_menu(void) {
@@ -987,6 +1065,13 @@ int main(int argc, char **argv) {
     print_watch(&g_arc, secs);
     arc_close(&g_arc);
     return 0;
+  }
+  if (!strncmp(argv[1], "--gfx-watch", 11)) {
+    int iv = (argv[1][11] == '=') ? atoi(argv[1] + 12) : 30;
+    if (iv < 5) iv = 5;
+    int rc = gfx_watch_loop(iv);
+    arc_close(&g_arc);
+    return rc;
   }
   if (!strncmp(argv[1], "--gfx-save", 10)) {
     char path[MAX_PATH];

@@ -11,6 +11,15 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.7.0
+
+- `--gfx-watch[=seconds]`: polls every supported 3D feature and appends a timestamped
+  `name  old_enable/old_value -> new_enable/new_value` line to
+  `%APPDATA%\ArcTray\gfx-watch.log` whenever something changes, plus a baseline block
+  at start, `became readable` / `now unreadable` transitions and an hourly heartbeat.
+  Default interval 30 s (minimum 5). Used to catch a third party (IGS, driver) quietly
+  rewriting the user's graphics settings.
+
 ## 1.6.0
 
 - `--gfx-save[=file]` / `--gfx-restore[=file]` and the matching **Graphics → Save these
