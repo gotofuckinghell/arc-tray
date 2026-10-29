@@ -4,6 +4,30 @@ Everything here was measured on the live Arc A770 (driver 32.0.101.9150) or take
 the IGCL/Sysman surfaces the driver actually implements. It is the input for the next
 ArcTray menu block; nothing in this file is applied by the current binary.
 
+## 0. Implemented in 1.4.0
+
+`src/gfx.c` + `--gfx` / `--gfx-set=<name>:<value>` + the **Graphics** tray submenu cover
+the features whose values the driver actually stores on this card:
+
+| name | id | type | values |
+|---|---|---|---|
+| `frame-limit` | 2 | INT32 | 0 (off), 30, 60, 90, 120, 144, 165, 240 |
+| `flip-mode` | 9 | ENUM bitmask | 1 app-default, 2 vsync-off, 4 vsync-on, 8 smooth-sync, 16 speed-frame, 32 capped-to-panel |
+| `low-latency` | 16 | ENUM | 0 off, 1 on, 2 on+boost |
+| `frame-gen` | 17 | ENUM | 0 app-choice, 1 2x, 2 3x, 3 4x |
+
+Measured round-trip on the A770: `flip-mode 2 → 2`, `low-latency 2 → 2`,
+`frame-gen 1 → 1`, `frame-limit 60 → 60`, every write read back and restored.
+
+Two layout facts the header settles: the value union differs per type
+(`ENUM` is a single `uint32 EnableType` at the union start, `INT/UINT/FLOAT` are
+`{bool Enable; value}`), and a feature that was never written answers
+`0x40000014 ERROR_DATA_NOT_FOUND` — after the first write it reads back normally.
+
+`cmaa`, `atomics-64`, `scope`, `app-profiles`, `live-state` are advertised by the caps
+but return `DATA_NOT_FOUND`/`CUSTOM`-only shapes; they stay out of the menu until they
+are understood.
+
 ## 1. What the A770 driver exposes that is not overclocking
 
 `ctlGetSupported3DCapabilities` on this card returns **9 features** (probe:

@@ -11,6 +11,16 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.4.0
+
+- **Graphics** menu block and `--gfx` / `--gfx-set=<name>:<value>`: FPS limit,
+  VSync/flip mode (bitmask), low latency and XeSS frame-generation override through
+  `ctlGetSet3DFeature`, with read-back verification and correct union handling per
+  value type (ENUM is a uint32 at the union start, INT/UINT are {bool,value}).
+- `src/gfx.c`/`gfx.h`, `src/probe_i2c.c`, `src/probe_gfx.c` (research probes).
+- docs: I2C findings (enumeration works — 5 pin pairs, 25 display outputs; every
+  transaction answers `0x40000017 ERROR_KMD_CALL`, so the KMD gate is still closed).
+
 ## 1.3.0
 
 - **Tweaks (latency)** menu block and `--tweaks` / `--tweak=<id>:on|off|revert`:

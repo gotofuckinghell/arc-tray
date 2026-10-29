@@ -2,6 +2,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include "arc.h"
 #include "tweaks.h"
+#include "gfx.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -123,6 +124,10 @@ static const int PL_STEPS[] = {115, 150, 190, 230, 252, 276, 300, 325, 350, 375,
 static const int CORE_STEPS[] = {0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300};
 static const int TEMP_STEPS[] = {60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115};
 static const int FAN_STEPS[] = {30, 40, 50, 60, 70, 80, 90, 100};
+static const int GFX_LL[] = {0, 1, 2};
+static const unsigned GFX_FLIP[] = {1, 2, 4, 8, 16, 32};
+static const int GFX_FPS[] = {0, 30, 60, 90, 120, 144, 165, 240};
+
 static const int VOLT_STEPS[] = {0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 288};
 
 static int mark_at(const int *arr, int n, double v, double tol) {
@@ -382,6 +387,55 @@ static HMENU build_menu(void) {
   AppendMenuW(root, MF_STRING, 9001, L"Open config file");
   AppendMenuW(root, MF_STRING, 9002, L"Reload config");
   AppendMenuW(root, MF_STRING, 9003, L"Refresh");
+  // ---- Graphics (non-OC IGCL features) ----
+  {
+    static const wchar_t *LLN[] = {L"off", L"on", L"on + boost"};
+    static const wchar_t *FLIPN[] = {L"application default", L"vsync off", L"vsync on", L"smooth sync", L"speed frame", L"capped to panel rate"};
+    int en = 0; unsigned v = 0;
+    HMENU gfx = CreatePopupMenu();
+
+    HMENU ll = CreatePopupMenu();
+    unsigned curLL = 0;
+    if (gfx_get(&g_arc, 16, &en, &curLL)) {
+      for (int i = 0; i < 3; i++) {
+        wchar_t l[64];
+        swprintf(l, 64, L"%s%s", LLN[i], curLL == (unsigned)GFX_LL[i] ? L"  ●" : L"");
+        AppendMenuW(ll, MF_STRING, 8000 + i, l);
+      }
+      wchar_t head[96];
+      swprintf(head, 96, L"Low latency  (%s)", curLL < 3 ? LLN[curLL] : L"?");
+      AppendMenuW(gfx, MF_POPUP, (UINT_PTR)ll, head);
+    }
+
+    unsigned curFlip = 0;
+    if (gfx_get(&g_arc, 9, &en, &curFlip)) {
+      HMENU fm = CreatePopupMenu();
+      for (int i = 0; i < 6; i++) {
+        wchar_t l[80];
+        swprintf(l, 80, L"%s%s", FLIPN[i], curFlip == GFX_FLIP[i] ? L"  ●" : L"");
+        AppendMenuW(fm, MF_STRING, 8100 + i, l);
+      }
+      wchar_t head[96];
+      swprintf(head, 96, L"VSync / flip mode  (0x%x)", curFlip);
+      AppendMenuW(gfx, MF_POPUP, (UINT_PTR)fm, head);
+    }
+
+    unsigned curFps = 0;
+    if (gfx_get(&g_arc, 2, &en, &curFps)) {
+      HMENU fp = CreatePopupMenu();
+      for (int i = 0; i < 8; i++) {
+        wchar_t l[48];
+        if (GFX_FPS[i] == 0) swprintf(l, 48, L"off%s", curFps == 0 ? L"  ●" : L"");
+        else swprintf(l, 48, L"%d fps%s", GFX_FPS[i], curFps == (unsigned)GFX_FPS[i] ? L"  ●" : L"");
+        AppendMenuW(fp, MF_STRING, 8200 + i, l);
+      }
+      wchar_t head[96];
+      swprintf(head, 96, L"FPS limit  (%u)", curFps);
+      AppendMenuW(gfx, MF_POPUP, (UINT_PTR)fp, head);
+    }
+    if (GetMenuItemCount(gfx) > 0) AppendMenuW(root, MF_POPUP, (UINT_PTR)gfx, L"Graphics");
+  }
+
   HMENU tw = CreatePopupMenu();
   for (int i = 0; i < tweaks_count(); i++) {
     const TweakDef *td = tweak_at(i);
@@ -432,6 +486,27 @@ static void handle_cmd(HWND hwnd, int cmd) {
     int v = TEMP_STEPS[cmd - 4000];
     int ok = (v > 90) ? arc_set_temp_ext(&g_arc, v, msg, sizeof msg) : arc_set_temp(&g_arc, v, msg, sizeof msg);
     show_result(hwnd, ok, msg);
+    return;
+  }
+  if (cmd >= 8000 && cmd < 8003) {
+    int v = GFX_LL[cmd - 8000];
+    int ok = gfx_set(&g_arc, 16, 1, (unsigned)v);
+    char m[96]; snprintf(m, sizeof m, "low latency -> %d (%s)", v, ok ? "ok" : "refused");
+    show_result(hwnd, ok, m);
+    return;
+  }
+  if (cmd >= 8100 && cmd < 8106) {
+    unsigned v = GFX_FLIP[cmd - 8100];
+    int ok = gfx_set(&g_arc, 9, 1, v);
+    char m[96]; snprintf(m, sizeof m, "flip mode -> 0x%x (%s)", v, ok ? "ok" : "refused");
+    show_result(hwnd, ok, m);
+    return;
+  }
+  if (cmd >= 8200 && cmd < 8208) {
+    unsigned v = (unsigned)GFX_FPS[cmd - 8200];
+    int ok = gfx_set(&g_arc, 2, 1, v);
+    char m[96]; snprintf(m, sizeof m, "fps limit -> %u (%s)", v, ok ? "ok" : "refused");
+    show_result(hwnd, ok, m);
     return;
   }
   if (cmd >= 7000 && cmd < 7000 + tweaks_count()) {
@@ -800,6 +875,38 @@ int main(int argc, char **argv) {
     print_watch(&g_arc, secs);
     arc_close(&g_arc);
     return 0;
+  }
+  if (!strcmp(argv[1], "--gfx")) {
+    GfxFeature f[64];
+    int n = gfx_caps(&g_arc, f, 64);
+    printf("features: %d\n", n);
+    for (int i = 0; i < n; i++) {
+      int en = -1; unsigned v = 0;
+      int ok = gfx_get(&g_arc, f[i].id, &en, &v);
+      printf("  %-18s id=%2d type=%d perApp=%d  %s enable=%d value=%u\n",
+             f[i].name, f[i].id, f[i].value_type, f[i].per_app,
+             ok ? "ok  " : "n/a ", en, v);
+    }
+    arc_close(&g_arc);
+    return 0;
+  }
+  if (!strncmp(argv[1], "--gfx-set=", 10)) {
+    const char *spec = argv[1] + 10;          // <name>:<value>
+    const char *colon = strchr(spec, ':');
+    if (!colon) { fprintf(stderr, "usage: --gfx-set=<name>:<value>\n"); arc_close(&g_arc); return 2; }
+    char name[64] = {0};
+    size_t n = (size_t)(colon - spec); if (n >= sizeof name) n = sizeof name - 1;
+    memcpy(name, spec, n);
+    int id = gfx_id_by_name(name);
+    if (id < 0) { fprintf(stderr, "unknown feature: %s\n", name); arc_close(&g_arc); return 2; }
+    unsigned val = (unsigned)atoi(colon + 1);
+    int ok = gfx_set(&g_arc, id, 1, val);
+    int en = -1; unsigned got = 0;
+    int rd = gfx_get(&g_arc, id, &en, &got);
+    printf("%s set %u: %s; read back %s value=%u (enable=%d)\n",
+           name, val, ok ? "ok" : "refused", rd ? "ok" : "n/a", got, en);
+    arc_close(&g_arc);
+    return (ok && rd && got == val) ? 0 : 1;
   }
   if (!strcmp(argv[1], "--tweaks")) {
     for (int i = 0; i < tweaks_count(); i++) {
