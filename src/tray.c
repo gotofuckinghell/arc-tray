@@ -389,17 +389,23 @@ static HMENU build_menu(void) {
   AppendMenuW(root, MF_STRING, 9003, L"Refresh");
   // ---- Graphics (non-OC IGCL features) ----
   {
-    static const wchar_t *LLN[] = {L"off", L"on", L"on + boost"};
-    static const wchar_t *FLIPN[] = {L"application default", L"vsync off", L"vsync on", L"smooth sync", L"speed frame", L"capped to panel rate"};
-    int en = 0; unsigned v = 0;
+    static const wchar_t *LLN[] = {L"off  — driver default", L"on  — cuts input lag", L"on + boost  — lowest lag, more power"};
+    static const wchar_t *FLIPN[] = {
+      L"application default  — game decides",
+      L"vsync off  — tearing, lowest lag",
+      L"vsync on  — no tearing, adds lag",
+      L"smooth sync  — reduces tearing on async flips",
+      L"speed frame  — app-unaware triple buffering",
+      L"capped to panel rate  — smart vsync"};
+    int en = 0;
     HMENU gfx = CreatePopupMenu();
 
     HMENU ll = CreatePopupMenu();
     unsigned curLL = 0;
     if (gfx_get(&g_arc, 16, &en, &curLL)) {
       for (int i = 0; i < 3; i++) {
-        wchar_t l[64];
-        swprintf(l, 64, L"%s%s", LLN[i], curLL == (unsigned)GFX_LL[i] ? L"  ●" : L"");
+        wchar_t l[128];
+        swprintf(l, 128, L"%s%s", LLN[i], curLL == (unsigned)GFX_LL[i] ? L"  ●" : L"");
         AppendMenuW(ll, MF_STRING, 8000 + i, l);
       }
       wchar_t head[96];
@@ -411,8 +417,8 @@ static HMENU build_menu(void) {
     if (gfx_get(&g_arc, 9, &en, &curFlip)) {
       HMENU fm = CreatePopupMenu();
       for (int i = 0; i < 6; i++) {
-        wchar_t l[80];
-        swprintf(l, 80, L"%s%s", FLIPN[i], curFlip == GFX_FLIP[i] ? L"  ●" : L"");
+        wchar_t l[160];
+        swprintf(l, 160, L"%s%s", FLIPN[i], curFlip == GFX_FLIP[i] ? L"  ●" : L"");
         AppendMenuW(fm, MF_STRING, 8100 + i, l);
       }
       wchar_t head[96];
@@ -424,9 +430,9 @@ static HMENU build_menu(void) {
     if (gfx_get(&g_arc, 2, &en, &curFps)) {
       HMENU fp = CreatePopupMenu();
       for (int i = 0; i < 8; i++) {
-        wchar_t l[48];
-        if (GFX_FPS[i] == 0) swprintf(l, 48, L"off%s", curFps == 0 ? L"  ●" : L"");
-        else swprintf(l, 48, L"%d fps%s", GFX_FPS[i], curFps == (unsigned)GFX_FPS[i] ? L"  ●" : L"");
+        wchar_t l[96];
+        if (GFX_FPS[i] == 0) swprintf(l, 96, L"off  — uncapped%s", curFps == 0 ? L"  ●" : L"");
+        else swprintf(l, 96, L"%d fps  — cap frame rate%s", GFX_FPS[i], curFps == (unsigned)GFX_FPS[i] ? L"  ●" : L"");
         AppendMenuW(fp, MF_STRING, 8200 + i, l);
       }
       wchar_t head[96];
@@ -436,11 +442,11 @@ static HMENU build_menu(void) {
     // XeSS frame generation override (17)
     unsigned curFg = 0;
     if (gfx_get(&g_arc, 17, &en, &curFg)) {
-      static const wchar_t *FGN[] = {L"application choice", L"2x", L"3x", L"4x"};
+      static const wchar_t *FGN[] = {L"application choice  — game decides", L"2x  — 1 generated frame", L"3x  — 2 generated frames", L"4x  — 3 generated frames"};
       HMENU fgm = CreatePopupMenu();
       for (int i = 0; i < 4; i++) {
-        wchar_t l[64];
-        swprintf(l, 64, L"%s%s", FGN[i], curFg == (unsigned)i ? L"  ●" : L"");
+        wchar_t l[128];
+        swprintf(l, 128, L"%s%s", FGN[i], curFg == (unsigned)i ? L"  ●" : L"");
         AppendMenuW(fgm, MF_STRING, 8300 + i, l);
       }
       wchar_t head[96];
@@ -451,14 +457,14 @@ static HMENU build_menu(void) {
     unsigned curCmaa = 0, curAtom = 0;
     if (gfx_get(&g_arc, 4, &en, &curCmaa)) {
       HMENU m = CreatePopupMenu();
-      AppendMenuW(m, MF_STRING, 8400 + 0, curCmaa == 0 ? L"off  ●" : L"off");
-      AppendMenuW(m, MF_STRING, 8400 + 1, curCmaa != 0 ? L"on  ●" : L"on");
+      AppendMenuW(m, MF_STRING, 8400 + 0, curCmaa == 0 ? L"off  — driver default  ●" : L"off  — driver default");
+      AppendMenuW(m, MF_STRING, 8400 + 1, curCmaa != 0 ? L"on  — morphological AA  ●" : L"on  — morphological AA");
       AppendMenuW(gfx, MF_POPUP, (UINT_PTR)m, L"CMAA (anti-aliasing)");
     }
     if (gfx_get(&g_arc, 13, &en, &curAtom)) {
       HMENU m = CreatePopupMenu();
-      AppendMenuW(m, MF_STRING, 8500 + 0, curAtom == 0 ? L"off  ●" : L"off");
-      AppendMenuW(m, MF_STRING, 8500 + 1, curAtom != 0 ? L"on  ●" : L"on");
+      AppendMenuW(m, MF_STRING, 8500 + 0, curAtom == 0 ? L"off  — default  ●" : L"off  — default");
+      AppendMenuW(m, MF_STRING, 8500 + 1, curAtom != 0 ? L"on  — fixes some D3D12 titles  ●" : L"on  — fixes some D3D12 titles");
       AppendMenuW(gfx, MF_POPUP, (UINT_PTR)m, L"Emulated 64-bit atomics");
     }
 

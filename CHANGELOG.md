@@ -11,6 +11,13 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.5.1
+
+- Every Graphics entry now carries a one-line explanation in its label
+  (`vsync off — tearing, lowest lag`, `on + boost — lowest lag, more power`, …), so the
+  menu answers "what does this do" without a manual.
+- Build warning cleanup (`unused variable` in the Graphics block).
+
 ## 1.5.0
 
 - Graphics menu: **Frame generation (XeSS FG)** (app choice / 2x / 3x / 4x), **CMAA**
