@@ -184,27 +184,43 @@ static void show_result(HWND hwnd, int ok, const char *msg) {
   arc_read(&g_arc, &g_state);
 }
 
+static int clamp_range(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
 static void apply_profile(HWND hwnd, const Profile *p) {
   char msg[256], all[512] = {0};
   int ok = 1;
+  // A hand-edited INI must not be able to ask for an out-of-range operating point.
+  const int plMin = g_state.pl_min > 0 ? (int)g_state.pl_min : 115;
+  const int plMax = 500;
+  const int coreMax = g_state.core_max > 0 ? (int)g_state.core_max : 300;
+  const int voltMax = g_state.volt_max > 0 ? (int)g_state.volt_max : 288;
+  const int pl = clamp_range(p->pl, plMin, plMax);
+  const int core = clamp_range(p->core, 0, coreMax);
+  const int volt = clamp_range(p->volt_mv, 0, voltMax);
+  const int temp = clamp_range(p->temp, 60, 115);
+  const int fan = p->fan == -1 ? -1 : clamp_range(p->fan, 30, 100);
+  if (p->pl > 0 && pl != p->pl) logf_("profile %s: PL %d clamped to %d", p->name, p->pl, pl);
+  if (core != p->core) logf_("profile %s: core %d clamped to %d", p->name, p->core, core);
+  if (volt != p->volt_mv) logf_("profile %s: volt %d clamped to %d", p->name, p->volt_mv, volt);
+  if (temp != p->temp) logf_("profile %s: temp %d clamped to %d", p->name, p->temp, temp);
   if (p->pl > 0) {
-    if (arc_set_power(&g_arc, p->pl, msg, sizeof msg)) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
+    if (arc_set_power(&g_arc, pl, msg, sizeof msg)) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
     else { ok = 0; strncat_s(all, sizeof all, msg, _TRUNCATE); }
   }
-  if (p->core != 0 || ok) {
-    if (arc_set_core(&g_arc, p->core, msg, sizeof msg)) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
+  if (core != 0 || ok) {
+    if (arc_set_core(&g_arc, core, msg, sizeof msg)) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
     else { ok = 0; strncat_s(all, sizeof all, msg, _TRUNCATE); }
   }
-  if (p->volt_mv != 0) {
-    if (arc_set_volt(&g_arc, p->volt_mv, msg, sizeof msg)) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
+  if (volt != 0) {
+    if (arc_set_volt(&g_arc, volt, msg, sizeof msg)) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
     else { ok = 0; strncat_s(all, sizeof all, msg, _TRUNCATE); }
   }
   if (p->temp > 0) {
-    if ((p->temp > 90 ? arc_set_temp_ext(&g_arc, p->temp, msg, sizeof msg) : arc_set_temp(&g_arc, p->temp, msg, sizeof msg))) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
+    if ((temp > 90 ? arc_set_temp_ext(&g_arc, temp, msg, sizeof msg) : arc_set_temp(&g_arc, temp, msg, sizeof msg))) { strncat_s(all, sizeof all, msg, _TRUNCATE); strncat_s(all, sizeof all, "  ", _TRUNCATE); }
     else { ok = 0; strncat_s(all, sizeof all, msg, _TRUNCATE); }
   }
-  if (p->fan == -1 || p->fan > 0) {
-    if (arc_set_fan(&g_arc, p->fan == -1 ? 0 : 1, p->fan == -1 ? 0 : p->fan, msg, sizeof msg)) {
+  if (fan == -1 || fan > 0) {
+    if (arc_set_fan(&g_arc, fan == -1 ? 0 : 1, fan == -1 ? 0 : fan, msg, sizeof msg)) {
       strncat_s(all, sizeof all, msg, _TRUNCATE);
     } else { ok = 0; strncat_s(all, sizeof all, msg, _TRUNCATE); }
   }
@@ -298,6 +314,11 @@ static void release_hw(void) {
 }
 
 // ---- graphics snapshot (--gfx-save / --gfx-restore) -------------------------
+static int file_is_reparse(const char *path) {
+  DWORD a = GetFileAttributesA(path);
+  return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_REPARSE_POINT);
+}
+
 static int gfx_snap_path(char *out, size_t n, const char *file) {
   if (file && *file) { snprintf(out, n, "%s", file); return 1; }
   const char *base = getenv("APPDATA");
@@ -319,6 +340,7 @@ static int gfx_save(const char *path) {
   GfxFeature f[64];
   int n = gfx_caps(&g_arc, f, 64);
   if (n <= 0) return 0;
+  if (file_is_reparse(path)) { fprintf(stderr, "refusing to write %s: reparse point\n", path); return 0; }
   FILE *fp = fopen(path, "w");
   if (!fp) return 0;
   fprintf(fp, "# ArcTray graphics snapshot\n# name id enable value\n");
@@ -335,6 +357,7 @@ static int gfx_save(const char *path) {
 }
 
 static int gfx_restore(const char *path) {
+  if (file_is_reparse(path)) { fprintf(stderr, "refusing to read %s: reparse point\n", path); return 0; }
   FILE *fp = fopen(path, "r");
   if (!fp) { fprintf(stderr, "cannot open %s\n", path); return 0; }
   char line[256];
@@ -392,6 +415,7 @@ typedef struct { int id; int valid; int en; unsigned v; } WatchPrev;
 static int gfx_watch_loop(int interval_s) {
   char logp[MAX_PATH], ts[32];
   if (!gfx_watch_path(logp, sizeof logp)) return 2;
+  if (file_is_reparse(logp)) { fprintf(stderr, "refusing to log to a reparse point\n"); return 2; }
   FILE *log = fopen(logp, "a");
   if (!log) { fprintf(stderr, "cannot open %s\n", logp); return 2; }
 
@@ -807,7 +831,10 @@ static void handle_cmd(HWND hwnd, int cmd) {
     case 9001: {
       char quoted[MAX_PATH + 3];
       snprintf(quoted, sizeof quoted, "\"%s\"", g_ini);
-      ShellExecuteA(NULL, "open", "notepad.exe", quoted, NULL, SW_SHOWNORMAL);
+      char np[MAX_PATH] = {0};
+      GetSystemDirectoryA(np, MAX_PATH);
+      strncat_s(np, sizeof np, "\\notepad.exe", _TRUNCATE);
+      ShellExecuteA(NULL, "open", np, quoted, NULL, SW_SHOWNORMAL);
       break;
     }
     case 9002: load_ini(); balloon(hwnd, L"ArcTray", L"Config reloaded", NIIF_INFO); break;
@@ -1042,8 +1069,9 @@ static void print_state(void) {
   printf("volt offset: %.3f V  (range %.3f..%.3f)\n", g_state.volt_off, g_state.volt_min, g_state.volt_max);
   printf("temp limit : %.0f C  (range %.0f..%.0f, def %.0f)\n", g_state.temp_limit, g_state.temp_min, g_state.temp_max, g_state.temp_def);
   printf("vram       : clock %.0f MHz, effective %.0f MHz, temp %.0f C\n", g_state.vram_mhz, g_state.vram_eff_mhz, g_state.vram_temp);
-  printf("live       : %.0f MHz, %.0f C, fan %d%% (mode %d, state %d %s, maxRPM %d)\n", g_state.gpu_mhz, g_state.gpu_temp,
-         g_state.fan_pct, g_state.fan_mode, g_state.fan_state, g_state.fan_state_units ? "%" : "rpm", g_state.fan_max_rpm);
+  printf("live       : %.0f MHz, %.0f C, fan %d %s (mode %d, state %d %s, maxRPM %d)\n", g_state.gpu_mhz, g_state.gpu_temp,
+         g_state.fan_pct, g_state.fan_state_units ? "%" : "rpm",
+         g_state.fan_mode, g_state.fan_state, g_state.fan_state_units ? "%" : "rpm", g_state.fan_max_rpm);
 }
 
 static void dump_menu(HMENU m, int depth) {

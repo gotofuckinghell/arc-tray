@@ -5,6 +5,38 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt.lib")
+
+// The bundled 2023 IGCL runtime is unsigned (verified: no Authenticode signature), and
+// it is loaded into an elevated process. Pin its SHA-256 so a swapped file cannot become
+// code execution; ARCTRAY_ALLOW_UNSIGNED=1 is the deliberate escape hatch.
+#define EXT_DLL_SHA256 "B1D0FAD73F7A3ED2DD417665A45E887D9159CD388F329C4A54E4672B198297EB"
+
+static int file_sha256_hex(const char *path, char out[65]) {
+  HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                         FILE_ATTRIBUTE_NORMAL, NULL);
+  if (f == INVALID_HANDLE_VALUE) return 0;
+  BCRYPT_ALG_HANDLE alg = NULL; BCRYPT_HASH_HANDLE h = NULL;
+  unsigned char digest[32];
+  int ok = 0;
+  if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0) != 0) goto done;
+  if (BCryptCreateHash(alg, &h, NULL, 0, NULL, 0, 0) != 0) goto done;
+  unsigned char buf[65536]; DWORD got = 0;
+  for (;;) {
+    if (!ReadFile(f, buf, sizeof buf, &got, NULL) || got == 0) break;
+    if (BCryptHashData(h, buf, got, 0) != 0) goto done;
+  }
+  if (BCryptFinishHash(h, digest, sizeof digest, 0) != 0) goto done;
+  for (int i = 0; i < 32; i++) snprintf(out + i * 2, 3, "%02X", digest[i]);
+  out[64] = 0;
+  ok = 1;
+done:
+  if (h) BCryptDestroyHash(h);
+  if (alg) BCryptCloseAlgorithmProvider(alg, 0);
+  CloseHandle(f);
+  return ok;
+}
 
 #define CTL_SUCCESS 0
 
@@ -89,7 +121,8 @@ int arc_open(ArcDev *a, char *err, size_t errcap) {
     snprintf(err, errcap, "IntelControlLib.dll not found in DriverStore");
     return 0;
   }
-  a->igcl = LoadLibraryA(a->dll_path);
+  a->igcl = LoadLibraryExA(a->dll_path, NULL,
+                          LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
   if (!a->igcl) { snprintf(err, errcap, "LoadLibrary(IntelControlLib) failed: %lu", GetLastError()); return 0; }
 
   BIND_IGCL(ctlInit, ctl_result_t(*)(ctl_init_args_t *, void **));
@@ -543,7 +576,15 @@ int arc_ext_available(ArcDev *a) {
   a->ext_ready = 1;
   char dll[MAX_PATH];
   if (!find_ext_dll(a, dll, sizeof dll)) return 0;
-  HMODULE h = LoadLibraryA(dll);
+  char hash[65] = {0};
+  const char *allow = getenv("ARCTRAY_ALLOW_UNSIGNED");
+  int pinned = file_sha256_hex(dll, hash) && _stricmp(hash, EXT_DLL_SHA256) == 0;
+  if (!pinned && !(allow && *allow && *allow != '0')) {
+    fprintf(stderr, "refusing unsigned 2023 runtime %s (sha256 %s)\n", dll, hash[0] ? hash : "unreadable");
+    return 0;
+  }
+  HMODULE h = LoadLibraryExA(dll, NULL,
+                             LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
   if (!h) return 0;
   ctl_result_t (*init)(ctl_init_args_t *, void **) = (ctl_result_t(*)(ctl_init_args_t *, void **))GetProcAddress(h, "ctlInit");
   ctl_result_t (*enumd)(void *, uint32_t *, void **) = (ctl_result_t(*)(void *, uint32_t *, void **))GetProcAddress(h, "ctlEnumerateDevices");

@@ -16,6 +16,73 @@ Open a GitHub security advisory or a private issue with the output of
 `arctray.exe --selftest` and a description of the steps. Please do not post working
 exploits in a public issue before a fix is available.
 
+## Audit 2026-10-29 (post 1.7.1)
+
+Scope: `src/tray.c`, `src/arc.c`, `src/gfx.c`, `src/tweaks.c`, build flags, deployment
+ACLs, git history. Result: 4 fixes, 3 informational items, no network/IPC surface
+(`WSAStartup|socket|WinHttp|InternetOpen|URLDownload` → 0 hits), no secrets in history
+(`ghp_|glpat-|api_key|password` → 0 hits).
+
+### F2 — unsigned third-party runtime loaded into an elevated process (fixed)
+
+The bundled 2023 IGCL (`IntelControlLib-2023.dll`, needed for temperature limits above
+90 °C) carries **no Authenticode signature** (`Get-AuthenticodeSignature` → `NotSigned`),
+while the DriverStore copy is WHQL-signed by *Microsoft Windows Hardware Compatibility
+Publisher*. A swapped file in the tool folder would become code execution as
+administrator.
+
+Fix: the file's SHA-256 is pinned in `arc.c` (`EXT_DLL_SHA256 = B1D0FAD7…297EB`) and the
+runtime is loaded only when the hash matches; `ARCTRAY_ALLOW_UNSIGNED=1` is the explicit,
+documented escape hatch. The refusal prints the actual hash to stderr.
+
+### F3 — DLL search order on load (fixed)
+
+`LoadLibraryA(path)` lets the loader resolve the DLL's own imports through the current
+directory and `PATH`. Both runtimes are now opened with
+`LoadLibraryExA(..., LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32)`.
+
+### F4 — unqualified helper process name (fixed)
+
+`ShellExecuteA("open", "notepad.exe", …)` resolved `notepad.exe` through the search
+order. It now uses the absolute path from `GetSystemDirectory`. `schtasks.exe` was
+already resolved against `%SystemRoot%\System32` inside `run_wait`.
+
+### F5 — hand-edited profile could request out-of-range operating points (fixed)
+
+Profiles live in a user-writable INI; values are now clamped to the advertised ranges
+(PL 115…500 W, core 0…300 MHz, voltage 0…288 mV, temperature 60…115 °C, fan 30…100 %)
+and every clamp is written to the log. The kernel driver still validates, this is
+defence in depth against a typo turning into a multi-hundred-watt request.
+
+### F6 — writes through reparse points (fixed)
+
+The `%APPDATA%\ArcTray\` folder and the snapshot/log files are checked for
+`FILE_ATTRIBUTE_REPARSE_POINT` before any write; a junction or symlink is refused.
+
+### F7 — binary hardening (informational)
+
+`DllCharacteristics = 0x0160` → `DYNAMIC_BASE | NX_COMPAT | HIGH_ENTROPY_VA` (ASLR, DEP,
+64-bit ASLR). This mingw-w64 gcc emits **no** stack canaries: `-fstack-protector`,
+`-strong` and `-all` all produce zero `__stack_chk_*` references (verified with a
+one-function test), and CFG (`/guard:cf`) is MSVC-only. Residual mitigation is the small
+codebase, static linking and the absence of parsers other than the INI reader.
+
+### F8 — deployment ACL (verified)
+
+`icacls` on the portable folder: `SYSTEM`, `BUILTIN\Administrators`,
+`Administrator` — full control for those only. A non-admin cannot replace
+`arctray.exe`/the DLLs in place. Moving the folder somewhere user-writable would void
+this property; a public installer should target `Program Files`.
+
+### F9 — accepted by design
+
+- The tray keeps one IGCL client open for 20 s after a menu action, and the watcher keeps
+  one open for its whole lifetime (~23 MB). No IPC, sockets or shared memory are added.
+- `ARCTRAY_V1`, `ARCTRAY_NO_SYSMAN`, `ARCTRAY_PROPS_VERSION`, `ARCTRAY_VOLT_SYSMAN`,
+  `ARCTRAY_TWEAK_DEBUG` remain honoured only for the un-elevated developer workflow; they
+  change behaviour, not the loaded binary.
+- Overclocking can still hang the GPU (TDR); that is availability, not a security boundary.
+
 ## Findings
 
 ### F1 — DLL path taken from the environment in an elevated process (fixed)

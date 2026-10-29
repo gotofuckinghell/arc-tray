@@ -11,6 +11,21 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.8.0
+
+Security audit of the whole tool (see `SECURITY.md`, "Audit 2026-10-29"):
+
+- **SHA-256 pin for the unsigned 2023 IGCL runtime** — the bundled DLL has no Authenticode
+  signature, so it is loaded only when its hash matches `EXT_DLL_SHA256`
+  (`B1D0FAD7…297EB`); `ARCTRAY_ALLOW_UNSIGNED=1` is the documented escape hatch.
+- Both runtimes load through `LoadLibraryExA(LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+  LOAD_LIBRARY_SEARCH_SYSTEM32)` — no current-directory/PATH import resolution.
+- `notepad.exe` (config editor) runs by absolute `%SystemRoot%\System32` path.
+- Profile values clamped to the advertised ranges (PL 115–500 W, core 0–300 MHz,
+  voltage 0–288 mV, temp 60–115 °C, fan 30–100 %), each clamp logged.
+- Snapshot, restore and watch refuse reparse points at file level as well as folder level.
+- `--state` fan readout fixed: RPM was printed with a `%` suffix.
+
 ## 1.7.1
 
 Code-review pass over `gfx.c`, `arc.c`, `tray.c` (gcc `-fanalyzer` + manual read):
