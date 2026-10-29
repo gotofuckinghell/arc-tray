@@ -330,6 +330,9 @@ int arc_read(ArcDev *a, ArcState *st) {
     if (a->ctlPowerTelemetryGetV2(a->dev, &t) == 0) {
       if (t.gpuCurrentClockFrequency.bSupported) st->gpu_mhz = t.gpuCurrentClockFrequency.value;
       if (t.gpuCurrentTemperature.bSupported) st->gpu_temp = t.gpuCurrentTemperature.value;
+      if (t.vramCurrentClockFrequency.bSupported) st->vram_mhz = t.vramCurrentClockFrequency.value;
+      if (t.vramCurrentEffectiveFrequency.bSupported) st->vram_eff_mhz = t.vramCurrentEffectiveFrequency.value;
+      if (t.vramCurrentTemperature.bSupported) st->vram_temp = t.vramCurrentTemperature.value;
       if (t.fanSpeed[0].bSupported) st->fan_pct = (int)(t.fanSpeed[0].value + 0.5);
       tele_ok = 1;
     }
@@ -340,6 +343,9 @@ int arc_read(ArcDev *a, ArcState *st) {
     if (a->ctlPowerTelemetryGet(a->dev, &t) == 0) {
       if (t.gpuCurrentClockFrequency.bSupported) st->gpu_mhz = t.gpuCurrentClockFrequency.value;
       if (t.gpuCurrentTemperature.bSupported) st->gpu_temp = t.gpuCurrentTemperature.value;
+      if (t.vramCurrentClockFrequency.bSupported) st->vram_mhz = t.vramCurrentClockFrequency.value;
+      if (t.vramCurrentEffectiveFrequency.bSupported) st->vram_eff_mhz = t.vramCurrentEffectiveFrequency.value;
+      if (t.vramCurrentTemperature.bSupported) st->vram_temp = t.vramCurrentTemperature.value;
       if (t.fanSpeed[0].bSupported) st->fan_pct = (int)(t.fanSpeed[0].value + 0.5);
     }
   }
@@ -616,16 +622,19 @@ static double ze_scale_of(ArcDev *a) {
 int arc_set_volt(ArcDev *a, int mv, char *msg, size_t cap) {
   if (!a->elevated) { snprintf(msg, cap, "admin rights required"); return 0; }
   if (!ensure_waiver(a, msg, cap)) return 0;
+  const char *envs = getenv("ARCTRAY_VOLT_SYSMAN");
+  int forced = envs && *envs && *envs != '0';
 
-  if (mv >= 0) { // positive offset lives on the IGCL surface
+  if (!forced && mv >= 0) { // positive offset lives on the IGCL surface
     if (!a->ctlOverclockGpuMaxVoltageOffsetSetV2 && !a->ctlOverclockGpuVoltageOffsetSet) {
       snprintf(msg, cap, "no voltage-offset setter");
       return 0;
     }
     // Clearing this control (0 mV) resets EVERY IGCL overclock control on the A770,
     // so remember the live PL / core offset and put them back afterwards.
-    double keepPL = 0, keepCore = 0;
+    double keepPL = 0, keepCore = 0, keepTemp = 0;
     if (mv == 0) {
+      if (a->ctlOverclockTemperatureLimitGetV2) a->ctlOverclockTemperatureLimitGetV2(a->dev, &keepTemp);
       if (a->pwr && a->zesPowerGetLimits) {
         zes_power_sustained_limit_t s; memset(&s, 0, sizeof s);
         zes_power_burst_limit_t b; memset(&b, 0, sizeof b);
@@ -646,6 +655,7 @@ int arc_set_volt(ArcDev *a, int mv, char *msg, size_t cap) {
       char m2[96];
       if (keepPL > 0) { if (arc_set_power(a, keepPL, m2, sizeof m2)) strncat_s(extra, sizeof extra, " PL restored", _TRUNCATE); }
       if (keepCore > 0) { if (arc_set_core(a, keepCore, m2, sizeof m2)) strncat_s(extra, sizeof extra, " core restored", _TRUNCATE); }
+      if (keepTemp > 0) { if (arc_set_temp(a, keepTemp, m2, sizeof m2)) strncat_s(extra, sizeof extra, " temp restored", _TRUNCATE); }
     }
     double got = NAN;
     if (a->ctlOverclockGpuMaxVoltageOffsetGetV2) a->ctlOverclockGpuMaxVoltageOffsetGetV2(a->dev, &got);
@@ -659,9 +669,22 @@ int arc_set_volt(ArcDev *a, int mv, char *msg, size_t cap) {
   // writing mode=2 + freqTarget + voltageTarget rewrites the operating point, so
   // the IGCL core offset is re-based (+75 -> +224 MHz) and a phantom base offset
   // appears (-31 mV). Not shipped until the V/F mapping is done properly.
-  if (mv < 0) {
-    snprintf(msg, cap, "undervolt needs the Sysman V/F pair - not supported yet (positive offsets work)");
+  if (mv < 0 && !forced) {
+    snprintf(msg, cap, "undervolt needs the Sysman V/F pair; rerun with --sysman to try it");
     return 0;
+  }
+  // The Sysman path rewrites the whole operating point, so remember what the IGCL
+  // controls held and put them back after the write.
+  double snapPL = 0, snapCore = 0, snapTemp = 0;
+  if (forced) {
+    if (a->pwr && a->zesPowerGetLimits) {
+      zes_power_sustained_limit_t s; memset(&s, 0, sizeof s);
+      zes_power_burst_limit_t b; memset(&b, 0, sizeof b);
+      zes_power_peak_limit_t p; memset(&p, 0, sizeof p);
+      if (a->zesPowerGetLimits(a->pwr, &s, &b, &p) == 0) snapPL = s.power / 1000.0;
+    }
+    if (a->ctlOverclockGpuFrequencyOffsetGetV2) a->ctlOverclockGpuFrequencyOffsetGetV2(a->dev, &snapCore);
+    if (a->ctlOverclockTemperatureLimitGetV2) a->ctlOverclockTemperatureLimitGetV2(a->dev, &snapTemp);
   }
   // negative offset: Level Zero Sysman legacy frequency OC surface
   if (!a->freq || !a->zesFrequencyOcGetVoltageTarget || !a->zesFrequencyOcSetVoltageTarget ||
@@ -670,6 +693,7 @@ int arc_set_volt(ArcDev *a, int mv, char *msg, size_t cap) {
     return 0;
   }
   if (mv < -200) mv = -200;
+  if (mv > 500) mv = 500; // experimental ceiling; the driver clamps what it wants
   double scale = ze_scale_of(a);
   double rawTgt = 0, rawOff = 0;
   ze_result_t r = a->zesFrequencyOcGetVoltageTarget(a->freq, &rawTgt, &rawOff);
@@ -707,6 +731,13 @@ int arc_set_volt(ArcDev *a, int mv, char *msg, size_t cap) {
   if (a->zesFrequencyOcGetVoltageTarget(a->freq, &chkTgt, &chkOff) == 0) {
     double offV = fabs(chkOff) > 10.0 ? chkOff / 1000.0 : chkOff;
     if (fabs(offV - wantOffV) > 0.0015) { snprintf(msg, cap, "volt readback %+.0f mV (asked %+d)", offV * 1000, mv); return 0; }
+    if (forced) {
+      char m2[96], extra[96] = {0};
+      if (snapPL > 0 && arc_set_power(a, snapPL, m2, sizeof m2)) strncat_s(extra, sizeof extra, " PL", _TRUNCATE);
+      if (snapCore != 0 && arc_set_core(a, snapCore, m2, sizeof m2)) strncat_s(extra, sizeof extra, " core", _TRUNCATE);
+      if (snapTemp > 0 && arc_set_temp(a, snapTemp, m2, sizeof m2)) strncat_s(extra, sizeof extra, " temp", _TRUNCATE);
+      if (extra[0]) { snprintf(msg, cap, "volt %+.0f mV ok (sysman), restored:%s", offV * 1000, extra); return 1; }
+    }
     snprintf(msg, cap, "volt %+.0f mV ok (sysman)", offV * 1000);
     return 1;
   }

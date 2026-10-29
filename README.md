@@ -75,6 +75,10 @@ arctray.exe --set volt=50               voltage offset, mV (positive only)
 arctray.exe --profile=Gaming            apply an ini profile
 arctray.exe --autostart=on|off|status   logon task
 arctray.exe --watch[=sec]               real board power (W) from the IGCL energy counter
+arctray.exe --tweaks                    latency registry tweaks with their state
+arctray.exe --tweak=<id>:on|off|revert  toggle one tweak (hags, mpo, gamedvr, fso,
+                                        mmcss-games, system-responsiveness,
+                                        net-throttling, timer-resolution, win32-priority)
 arctray.exe --selftest                  OS build, driver, which IGCL/Sysman symbols exist
 arctray.exe --caps                      Sysman V/F capabilities and current targets
 arctray.exe --about                     version, attribution, links

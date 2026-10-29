@@ -184,6 +184,7 @@ typedef struct {
   double pl_sustained, pl_burst, pl_igcl;
   double core_off, volt_off, temp_limit;
   double gpu_mhz, gpu_temp;
+  double vram_mhz, vram_eff_mhz, vram_temp;
   int fan_pct, fan_mode, fan_can_control, fan_available;
   int fan_state, fan_state_units, fan_max_rpm, fan_set_pct;
   int have_sysman, elevated;

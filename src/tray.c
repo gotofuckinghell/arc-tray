@@ -1,6 +1,7 @@
 // tray.c — headless Arc tuner: Win32 tray menu + CLI. No Electron, no GUI window.
 #define WIN32_LEAN_AND_MEAN
 #include "arc.h"
+#include "tweaks.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,10 +142,26 @@ static void fmt_state(wchar_t *out, size_t cap) {
            g_state.elevated ? L"" : L"  (no admin)");
 }
 
+// ---- tray icon lifecycle -------------------------------------------------
+// Shell_NotifyIcon fails with E_FAIL (0x80004005) when the logon task starts
+// before Explorer has created its tray window, and the icon never appears.
+// Keep the NOTIFYICONDATA in one place, retry on a timer, and re-add it when
+// Explorer broadcasts TaskbarCreated (explorer.exe restart).
+static NOTIFYICONDATAW g_nid;
+static int g_tray_added = 0;
+static int g_tray_attempts = 0;
+static UINT g_taskbar_created = 0;
+#define TIMER_TRAY_RETRY 8
+
+static int tray_add_once(void) {
+  if (g_tray_added) return 1;
+  if (Shell_NotifyIconW(NIM_ADD, &g_nid)) { g_tray_added = 1; return 1; }
+  return 0;
+}
+
 static void balloon(HWND hwnd, const wchar_t *title, const wchar_t *text, DWORD flags) {
   NOTIFYICONDATAW nid;
-  memset(&nid, 0, sizeof nid);
-  nid.cbSize = sizeof nid;
+  nid = g_nid;
   nid.hWnd = hwnd;
   nid.uID = ID_TRAY;
   nid.uFlags = NIF_INFO;
@@ -188,7 +205,7 @@ static void apply_profile(HWND hwnd, const Profile *p) {
   show_result(hwnd, ok, all);
 }
 
-#define APP_VERSION L"1.2.0"
+#define APP_VERSION L"1.2.1"
 #define URL_GITHUB L"https://github.com/gotofuckinghell"
 #define URL_GITLAB L"https://gitlab.com/grubyrams"
 #define URL_TELEGRAM L"https://t.me/hwretard"
@@ -364,14 +381,26 @@ static HMENU build_menu(void) {
   AppendMenuW(root, MF_STRING, 9001, L"Open config file");
   AppendMenuW(root, MF_STRING, 9002, L"Reload config");
   AppendMenuW(root, MF_STRING, 9003, L"Refresh");
+  HMENU tw = CreatePopupMenu();
+  for (int i = 0; i < tweaks_count(); i++) {
+    const TweakDef *td = tweak_at(i);
+    int st = tweak_state(td);
+    UINT flags = MF_STRING | (st == 1 ? MF_CHECKED : 0);
+    AppendMenuW(tw, flags, 7000 + i, td->name);
+  }
+  AppendMenuW(tw, MF_SEPARATOR, 0, NULL);
+  AppendMenuW(tw, MF_STRING, 7100, L"Tweaks help...");
+  AppendMenuW(tw, MF_STRING, 7101, L"Revert all tweaks");
+  AppendMenuW(root, MF_POPUP, (UINT_PTR)tw, L"Tweaks (latency)");
   AppendMenuW(root, MF_STRING | (autostart_enabled() ? MF_CHECKED : 0), 9006, L"Start with Windows");
   if (!g_state.elevated) AppendMenuW(root, MF_STRING, 9005, L"Restart as administrator");
-  HMENU links = CreatePopupMenu();
-  AppendMenuW(links, MF_STRING, 9101, L"GitHub");
-  AppendMenuW(links, MF_STRING, 9102, L"GitLab");
-  AppendMenuW(links, MF_STRING, 9103, L"Telegram — /HW/ RETARDS");
-  AppendMenuW(root, MF_POPUP, (UINT_PTR)links, L"Links");
-  AppendMenuW(root, MF_STRING, 9007, L"About ArcTray...");
+  HMENU about = CreatePopupMenu();
+  AppendMenuW(about, MF_STRING, 9007, L"About ArcTray...");
+  AppendMenuW(about, MF_SEPARATOR, 0, NULL);
+  AppendMenuW(about, MF_STRING, 9101, L"GitHub — gotofuckinghell");
+  AppendMenuW(about, MF_STRING, 9102, L"GitLab — grubyrams");
+  AppendMenuW(about, MF_STRING, 9103, L"Telegram — /HW/ RETARDS");
+  AppendMenuW(root, MF_POPUP, (UINT_PTR)about, L"About");
   AppendMenuW(root, MF_SEPARATOR, 0, NULL);
   AppendMenuW(root, MF_STRING, 9004, L"Exit");
   return root;
@@ -402,6 +431,18 @@ static void handle_cmd(HWND hwnd, int cmd) {
     show_result(hwnd, ok, msg);
     return;
   }
+  if (cmd >= 7000 && cmd < 7000 + tweaks_count()) {
+    const TweakDef *td = tweak_at(cmd - 7000);
+    int want = tweak_state(td) != 1;
+    wchar_t err[256] = {0};
+    int ok = tweak_apply(td, want, err, 256);
+    wchar_t msg[768];
+    if (ok) swprintf(msg, 768, L"%s: %s%s\n%s", td->name, want ? L"ON" : L"OFF",
+                     td->needs_reboot ? L" (reboot needed)" : L"", td->desc);
+    else swprintf(msg, 768, L"%s: %s", td->name, err);
+    balloon(hwnd, ok ? L"ArcTray" : L"ArcTray — failed", ok ? msg : err, ok ? NIIF_INFO : NIIF_WARNING);
+    return;
+  }
   if (cmd >= 6000 && cmd < 6000 + (int)(sizeof VOLT_STEPS / sizeof VOLT_STEPS[0])) {
     int mv = VOLT_STEPS[cmd - 6000];
     int ok = arc_set_volt(&g_arc, mv, msg, sizeof msg);
@@ -416,6 +457,28 @@ static void handle_cmd(HWND hwnd, int cmd) {
     return;
   }
   switch (cmd) {
+    case 7100: { // help
+      wchar_t text[4000];
+      int off = swprintf(text, 4000, L"Registry tweaks (all reversible, admin only)\n\n");
+      for (int i = 0; i < tweaks_count() && off < 3600; i++) {
+        const TweakDef *td = tweak_at(i);
+        int st = tweak_state(td);
+        off += swprintf(text + off, 4000 - off, L"%s  [%s]%s\n%s\n\n",
+                        td->name, st == 1 ? L"ON" : st == 0 ? L"OFF" : L"mixed/absent",
+                        td->needs_reboot ? L"  (reboot)" : L"", td->desc);
+      }
+      MessageBoxW(hwnd, text, L"ArcTray — tweaks", MB_OK | MB_ICONINFORMATION);
+      break;
+    }
+    case 7101: { // revert all
+      wchar_t err[256] = {0};
+      int ok = 1;
+      for (int i = 0; i < tweaks_count(); i++)
+        if (!tweak_revert(tweak_at(i), err, 256)) ok = 0;
+      balloon(hwnd, ok ? L"ArcTray" : L"ArcTray — failed",
+              ok ? L"All tweaks reverted to Windows defaults" : err, ok ? NIIF_INFO : NIIF_WARNING);
+      break;
+    }
     case 9007: {
       wchar_t text[1600];
       swprintf(text, 1600,
@@ -473,6 +536,13 @@ static void handle_cmd(HWND hwnd, int cmd) {
 }
 
 static LRESULT CALLBACK wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+  if (g_taskbar_created && msg == g_taskbar_created) { // Explorer restarted
+    logf_("TaskbarCreated: re-adding icon");
+    g_tray_added = 0;
+    g_tray_attempts = 0;
+    if (!tray_add_once()) SetTimer(hwnd, TIMER_TRAY_RETRY, 500, NULL);
+    return 0;
+  }
   switch (msg) {
     case WM_TRAY:
       if (LOWORD(lp) == WM_RBUTTONUP || LOWORD(lp) == WM_CONTEXTMENU) {
@@ -498,6 +568,13 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       return 0;
     case WM_TIMER:
       if (wp == IDLE_TIMER) { KillTimer(hwnd, IDLE_TIMER); release_hw(); }
+      if (wp == TIMER_TRAY_RETRY) {
+        g_tray_attempts++;
+        if (tray_add_once() || g_tray_attempts > 120) {
+          logf_("tray retry done: added=%d attempts=%d", g_tray_added, g_tray_attempts);
+          KillTimer(hwnd, TIMER_TRAY_RETRY);
+        }
+      }
       return 0;
     case WM_DESTROY:
       logf_("WM_DESTROY");
@@ -517,27 +594,34 @@ static int run_tray(HINSTANCE inst) {
   wc.hInstance = inst;
   wc.lpszClassName = L"ArcTrayWnd";
   RegisterClassW(&wc);
-  HWND hwnd = CreateWindowExW(0, L"ArcTrayWnd", L"ArcTray", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, inst, NULL);
+  // A hidden TOP-LEVEL popup, not HWND_MESSAGE: broadcast messages such as
+  // "TaskbarCreated" only reach top-level windows, and without them the tray
+  // icon never comes back after an Explorer restart.
+  HWND hwnd = CreateWindowExW(WS_EX_TOOLWINDOW, L"ArcTrayWnd", L"ArcTray", WS_POPUP, 0, 0, 0, 0, NULL, NULL, inst, NULL);
   if (!hwnd) { logf_("CreateWindowEx failed: %lu", GetLastError()); return 1; }
   g_hwnd = hwnd;
   logf_("window created hwnd=%p", (void *)hwnd);
 
   NOTIFYICONDATAW nid;
-  memset(&nid, 0, sizeof nid);
-  nid.cbSize = sizeof nid;
-  nid.hWnd = hwnd;
-  nid.uID = ID_TRAY;
-  nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
-  nid.uCallbackMessage = WM_TRAY;
+  memset(&g_nid, 0, sizeof g_nid);
+  g_nid.cbSize = sizeof g_nid;
+  g_nid.hWnd = hwnd;
+  g_nid.uID = ID_TRAY;
+  g_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+  g_nid.uCallbackMessage = WM_TRAY;
+  g_taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
+  nid = g_nid;
   wchar_t ico[MAX_PATH];
   GetModuleFileNameW(NULL, ico, MAX_PATH);
   wchar_t *slash = wcsrchr(ico, L'\\');
   if (slash) wcscpy_s(slash + 1, MAX_PATH - (size_t)(slash + 1 - ico), L"arc.ico");
   nid.hIcon = (HICON)LoadImageW(NULL, ico, IMAGE_ICON, 32, 32, LR_LOADFROMFILE);
   if (!nid.hIcon) nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
-  wcscpy_s(nid.szTip, 128, L"ArcTray — Intel Arc tuner");
-  BOOL added = Shell_NotifyIconW(NIM_ADD, &nid);
-  logf_("tray add=%d err=%lu icon=%p", added, GetLastError(), (void*)nid.hIcon);
+  wcscpy_s(g_nid.szTip, 128, L"ArcTray — Intel Arc tuner");
+  g_nid = nid;
+  BOOL added = tray_add_once();
+  logf_("tray add=%d err=%lu icon=%p", added, added ? 0 : GetLastError(), (void *)g_nid.hIcon);
+  if (!added) SetTimer(hwnd, TIMER_TRAY_RETRY, 500, NULL); // Explorer may not be ready yet
 
   logf_("entering loop");
   MSG m;
@@ -664,6 +748,7 @@ static void print_state(void) {
   printf("core offset: %+.0f MHz  (range %+.0f..%+.0f)\n", g_state.core_off, g_state.core_min, g_state.core_max);
   printf("volt offset: %.3f V  (range %.3f..%.3f)\n", g_state.volt_off, g_state.volt_min, g_state.volt_max);
   printf("temp limit : %.0f C  (range %.0f..%.0f, def %.0f)\n", g_state.temp_limit, g_state.temp_min, g_state.temp_max, g_state.temp_def);
+  printf("vram       : clock %.0f MHz, effective %.0f MHz, temp %.0f C\n", g_state.vram_mhz, g_state.vram_eff_mhz, g_state.vram_temp);
   printf("live       : %.0f MHz, %.0f C, fan %d%% (mode %d, state %d %s, maxRPM %d)\n", g_state.gpu_mhz, g_state.gpu_temp,
          g_state.fan_pct, g_state.fan_mode, g_state.fan_state, g_state.fan_state_units ? "%" : "rpm", g_state.fan_max_rpm);
 }
@@ -697,6 +782,8 @@ int main(int argc, char **argv) {
          "  --set core=N           core clock offset (MHz)\n"
          "  --set temp=N           temperature limit (C)\n"
          "  --set fan=auto|N       fan mode / fixed percent\n"
+         "  --sysman               EXPERIMENTAL: write the voltage offset through the\n"
+         "                         Sysman V/F pair (allows >288 mV and negative values)\n"
          "  (no args)              run tray icon");
     return 0;
   }
@@ -710,6 +797,46 @@ int main(int argc, char **argv) {
     print_watch(&g_arc, secs);
     arc_close(&g_arc);
     return 0;
+  }
+  if (!strcmp(argv[1], "--tweaks")) {
+    for (int i = 0; i < tweaks_count(); i++) {
+      const TweakDef *td = tweak_at(i);
+      int st = tweak_state(td);
+      char id[64] = {0}, name[160] = {0};
+      WideCharToMultiByte(CP_UTF8, 0, td->id, -1, id, sizeof id, NULL, NULL);
+      WideCharToMultiByte(CP_UTF8, 0, td->name, -1, name, sizeof name, NULL, NULL);
+      printf("%-22s %-4s %s%s\n", id, st == 1 ? "ON" : st == 0 ? "OFF" : "MIX", name,
+             td->needs_reboot ? "  (reboot)" : "");
+      if (getenv("ARCTRAY_TWEAK_DEBUG")) tweak_debug(td);
+    }
+    arc_close(&g_arc);
+    return 0;
+  }
+  if (!strncmp(argv[1], "--tweak=", 8)) {
+    const char *spec = argv[1] + 8;          // <id>:on|off|revert
+    char id[64] = {0};
+    const char *colon = strchr(spec, ':');
+    if (!colon) { fprintf(stderr, "usage: --tweak=<id>:on|off|revert\n"); arc_close(&g_arc); return 2; }
+    size_t n = (size_t)(colon - spec); if (n >= sizeof id) n = sizeof id - 1;
+    memcpy(id, spec, n);
+    const char *act = colon + 1;
+    for (int i = 0; i < tweaks_count(); i++) {
+      const TweakDef *td = tweak_at(i);
+      char tid[64];
+      WideCharToMultiByte(CP_UTF8, 0, td->id, -1, tid, sizeof tid, NULL, NULL);
+      if (_stricmp(tid, id) != 0) continue;
+      wchar_t err[256] = {0};
+      int ok;
+      if (!strcmp(act, "revert")) ok = tweak_revert(td, err, 256);
+      else ok = tweak_apply(td, !strcmp(act, "on"), err, 256);
+      printf("%s %s: %s\n", id, act, ok ? "ok" : "failed");
+      if (!ok) printf("  %ls\n", err);
+      arc_close(&g_arc);
+      return ok ? 0 : 1;
+    }
+    fprintf(stderr, "unknown tweak id: %s\n", id);
+    arc_close(&g_arc);
+    return 2;
   }
   if (!strcmp(argv[1], "--about")) {
     printf("ArcTray %ls\n", APP_VERSION);
@@ -768,8 +895,10 @@ int main(int argc, char **argv) {
   }
   if (!strcmp(argv[1], "--set")) {
     int ok = 1;
+    for (int i = 2; i < argc; i++) if (!strcmp(argv[i], "--sysman")) _putenv_s("ARCTRAY_VOLT_SYSMAN", "1");
     for (int i = 2; i < argc; i++) {
       char msg[256] = {0};
+      if (!strcmp(argv[i], "--sysman")) continue;
       char *eq = strchr(argv[i], '=');
       if (!eq) { fprintf(stderr, "bad arg %s\n", argv[i]); ok = 0; continue; }
       *eq = 0;
