@@ -11,6 +11,13 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.5.0
+
+- Graphics menu: **Frame generation (XeSS FG)** (app choice / 2x / 3x / 4x), **CMAA**
+  and **emulated 64-bit atomics** added next to the existing low-latency, VSync/flip
+  and FPS-limit entries. All of them write through `ctlGetSet3DFeature` and are read
+  back before the tick is drawn.
+
 ## 1.4.0
 
 - **Graphics** menu block and `--gfx` / `--gfx-set=<name>:<value>`: FPS limit,

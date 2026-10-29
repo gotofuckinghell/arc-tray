@@ -433,6 +433,35 @@ static HMENU build_menu(void) {
       swprintf(head, 96, L"FPS limit  (%u)", curFps);
       AppendMenuW(gfx, MF_POPUP, (UINT_PTR)fp, head);
     }
+    // XeSS frame generation override (17)
+    unsigned curFg = 0;
+    if (gfx_get(&g_arc, 17, &en, &curFg)) {
+      static const wchar_t *FGN[] = {L"application choice", L"2x", L"3x", L"4x"};
+      HMENU fgm = CreatePopupMenu();
+      for (int i = 0; i < 4; i++) {
+        wchar_t l[64];
+        swprintf(l, 64, L"%s%s", FGN[i], curFg == (unsigned)i ? L"  ●" : L"");
+        AppendMenuW(fgm, MF_STRING, 8300 + i, l);
+      }
+      wchar_t head[96];
+      swprintf(head, 96, L"Frame generation (XeSS FG)  (%s)", curFg < 4 ? FGN[curFg] : L"?");
+      AppendMenuW(gfx, MF_POPUP, (UINT_PTR)fgm, head);
+    }
+    // CMAA (4) and emulated 64-bit atomics (13) are plain off/on enums
+    unsigned curCmaa = 0, curAtom = 0;
+    if (gfx_get(&g_arc, 4, &en, &curCmaa)) {
+      HMENU m = CreatePopupMenu();
+      AppendMenuW(m, MF_STRING, 8400 + 0, curCmaa == 0 ? L"off  ●" : L"off");
+      AppendMenuW(m, MF_STRING, 8400 + 1, curCmaa != 0 ? L"on  ●" : L"on");
+      AppendMenuW(gfx, MF_POPUP, (UINT_PTR)m, L"CMAA (anti-aliasing)");
+    }
+    if (gfx_get(&g_arc, 13, &en, &curAtom)) {
+      HMENU m = CreatePopupMenu();
+      AppendMenuW(m, MF_STRING, 8500 + 0, curAtom == 0 ? L"off  ●" : L"off");
+      AppendMenuW(m, MF_STRING, 8500 + 1, curAtom != 0 ? L"on  ●" : L"on");
+      AppendMenuW(gfx, MF_POPUP, (UINT_PTR)m, L"Emulated 64-bit atomics");
+    }
+
     if (GetMenuItemCount(gfx) > 0) AppendMenuW(root, MF_POPUP, (UINT_PTR)gfx, L"Graphics");
   }
 
@@ -487,6 +516,21 @@ static void handle_cmd(HWND hwnd, int cmd) {
     int ok = (v > 90) ? arc_set_temp_ext(&g_arc, v, msg, sizeof msg) : arc_set_temp(&g_arc, v, msg, sizeof msg);
     show_result(hwnd, ok, msg);
     return;
+  }
+  if (cmd >= 8300 && cmd < 8304) {
+    int ok = gfx_set(&g_arc, 17, 1, (unsigned)(cmd - 8300));
+    char m[96]; snprintf(m, sizeof m, "frame generation -> %d (%s)", cmd - 8300, ok ? "ok" : "refused");
+    show_result(hwnd, ok, m); return;
+  }
+  if (cmd >= 8400 && cmd < 8402) {
+    int ok = gfx_set(&g_arc, 4, 1, (unsigned)(cmd - 8400));
+    char m[96]; snprintf(m, sizeof m, "CMAA -> %d (%s)", cmd - 8400, ok ? "ok" : "refused");
+    show_result(hwnd, ok, m); return;
+  }
+  if (cmd >= 8500 && cmd < 8502) {
+    int ok = gfx_set(&g_arc, 13, 1, (unsigned)(cmd - 8500));
+    char m[96]; snprintf(m, sizeof m, "atomics-64 -> %d (%s)", cmd - 8500, ok ? "ok" : "refused");
+    show_result(hwnd, ok, m); return;
   }
   if (cmd >= 8000 && cmd < 8003) {
     int v = GFX_LL[cmd - 8000];

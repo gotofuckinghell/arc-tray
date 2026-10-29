@@ -4,7 +4,7 @@
 #pragma once
 
 #define ARCTRAY_VERSION_MAJOR 1
-#define ARCTRAY_VERSION_MINOR 4
+#define ARCTRAY_VERSION_MINOR 5
 #define ARCTRAY_VERSION_PATCH 0
 
 #define ARCTRAY_STR_(x) #x
