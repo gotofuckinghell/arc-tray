@@ -296,6 +296,56 @@ static void release_hw(void) {
   g_open = 0;
 }
 
+// ---- graphics snapshot (--gfx-save / --gfx-restore) -------------------------
+static int gfx_snap_path(char *out, size_t n, const char *file) {
+  if (file && *file) { snprintf(out, n, "%s", file); return 1; }
+  const char *base = getenv("APPDATA");
+  if (!base || !*base) return 0;
+  snprintf(out, n, "%s\\ArcTray\\gfx-snapshot.ini", base);
+  return 1;
+}
+
+static int gfx_save(const char *path) {
+  GfxFeature f[64];
+  int n = gfx_caps(&g_arc, f, 64);
+  if (n <= 0) return 0;
+  FILE *fp = fopen(path, "w");
+  if (!fp) return 0;
+  fprintf(fp, "# ArcTray graphics snapshot\n# name id enable value\n");
+  int saved = 0;
+  for (int i = 0; i < n; i++) {
+    int en = -1; unsigned v = 0;
+    if (!gfx_get(&g_arc, f[i].id, &en, &v)) continue;
+    fprintf(fp, "%s %d %d %u\n", f[i].name, f[i].id, en, v);
+    saved++;
+  }
+  fclose(fp);
+  printf("saved %d features to %s\n", saved, path);
+  return saved > 0;
+}
+
+static int gfx_restore(const char *path) {
+  FILE *fp = fopen(path, "r");
+  if (!fp) { fprintf(stderr, "cannot open %s\n", path); return 0; }
+  char line[256];
+  int done = 0, bad = 0;
+  while (fgets(line, sizeof line, fp)) {
+    if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
+    char name[64]; int id = -1, en = 1; unsigned v = 0;
+    if (sscanf(line, "%63s %d %d %u", name, &id, &en, &v) != 4 || id < 0) { bad++; continue; }
+    int ok = gfx_set(&g_arc, id, en, v);
+    int ren = -1; unsigned rv = 0;
+    int rd = gfx_get(&g_arc, id, &ren, &rv);
+    int match = rd && rv == v;
+    printf("  %-14s -> %u : %s%s\n", name, v,
+           ok ? "written" : "refused", match ? ", read back ok" : ", MISMATCH");
+    if (ok && match) done++; else bad++;
+  }
+  fclose(fp);
+  printf("restored %d, problems %d (%s)\n", done, bad, path);
+  return bad == 0 && done > 0;
+}
+
 static HMENU build_menu(void) {
   if (!ensure_open()) {
     HMENU root = CreatePopupMenu();
@@ -468,7 +518,12 @@ static HMENU build_menu(void) {
       AppendMenuW(gfx, MF_POPUP, (UINT_PTR)m, L"Emulated 64-bit atomics");
     }
 
-    if (GetMenuItemCount(gfx) > 0) AppendMenuW(root, MF_POPUP, (UINT_PTR)gfx, L"Graphics");
+    if (GetMenuItemCount(gfx) > 0) {
+      AppendMenuW(gfx, MF_SEPARATOR, 0, NULL);
+      AppendMenuW(gfx, MF_STRING, 8600, L"Save these settings (snapshot)");
+      AppendMenuW(gfx, MF_STRING, 8601, L"Restore saved settings");
+      AppendMenuW(root, MF_POPUP, (UINT_PTR)gfx, L"Graphics");
+    }
   }
 
   HMENU tw = CreatePopupMenu();
@@ -521,6 +576,13 @@ static void handle_cmd(HWND hwnd, int cmd) {
     int v = TEMP_STEPS[cmd - 4000];
     int ok = (v > 90) ? arc_set_temp_ext(&g_arc, v, msg, sizeof msg) : arc_set_temp(&g_arc, v, msg, sizeof msg);
     show_result(hwnd, ok, msg);
+    return;
+  }
+  if (cmd == 8600 || cmd == 8601) {
+    char path[MAX_PATH];
+    if (!gfx_snap_path(path, sizeof path, NULL)) { show_result(hwnd, 0, "snapshot path unavailable"); return; }
+    int ok = (cmd == 8600) ? gfx_save(path) : gfx_restore(path);
+    show_result(hwnd, ok, cmd == 8600 ? "graphics settings saved" : "graphics settings restored");
     return;
   }
   if (cmd >= 8300 && cmd < 8304) {
@@ -925,6 +987,20 @@ int main(int argc, char **argv) {
     print_watch(&g_arc, secs);
     arc_close(&g_arc);
     return 0;
+  }
+  if (!strncmp(argv[1], "--gfx-save", 10)) {
+    char path[MAX_PATH];
+    if (!gfx_snap_path(path, sizeof path, argv[1][10] == '=' ? argv[1] + 11 : NULL)) return 2;
+    int ok = gfx_save(path);
+    arc_close(&g_arc);
+    return ok ? 0 : 1;
+  }
+  if (!strncmp(argv[1], "--gfx-restore", 13)) {
+    char path[MAX_PATH];
+    if (!gfx_snap_path(path, sizeof path, argv[1][13] == '=' ? argv[1] + 14 : NULL)) return 2;
+    int ok = gfx_restore(path);
+    arc_close(&g_arc);
+    return ok ? 0 : 1;
   }
   if (!strcmp(argv[1], "--gfx")) {
     GfxFeature f[64];

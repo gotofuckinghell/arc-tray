@@ -11,6 +11,15 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.6.0
+
+- `--gfx-save[=file]` / `--gfx-restore[=file]` and the matching **Graphics → Save these
+  settings / Restore saved settings** entries. The snapshot keeps every readable feature
+  as `name id enable value` in `%APPDATA%\ArcTray\gfx-snapshot.ini`, and restore writes
+  each one back and verifies the read-back before reporting success.
+- Verified round-trip: 6 features saved, one deliberately broken (low latency 2→0),
+  restore returned all 6 with `read back ok`, problems 0.
+
 ## 1.5.1
 
 - Every Graphics entry now carries a one-line explanation in its label
