@@ -27,10 +27,12 @@ typedef ctl_result_t (*fn_gets)(void *, void *);
 int main(void) {
   ArcDev a; char err[256];
   if (!arc_open(&a, err, sizeof err)) { printf("open failed: %s\n", err); return 1; }
-  fn_gets gets = (fn_gets)GetProcAddress(a.igcl, "ctlGetSet3DFeature");
+  void *sym = (void *)GetProcAddress(a.igcl, "ctlGetSet3DFeature");
+  fn_gets gets = NULL;
+  if (sym) memcpy(&gets, &sym, sizeof gets);
   if (!gets) { printf("no ctlGetSet3DFeature\n"); return 1; }
   static char empty[1] = {0};
-  printf("sizeof(getset_t)=%zu\n", sizeof(getset_t));
+  printf("sizeof(getset_t)=%u\n", (unsigned)sizeof(getset_t));
   for (int id = 0; id <= 20; id++) {
     if (id == 11 || id == 12) {              /* CUSTOM payload: the driver dereferences
                                                 pCustomValue, a null one crashes IGCL */
