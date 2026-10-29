@@ -164,7 +164,8 @@ Requires an x64 mingw-w64 gcc (Strawberry Perl ships one as `x86_64-w64-mingw32-
 Python 3 for the icon generator.
 
 ```bash
-bash build.sh        # -> arctray.exe + arc.ico
+bash build.sh             # -> arctray.exe + arc.ico
+bash scripts/verify.sh    # build + invariants (read-only); --live also reads the card
 ```
 
 | File | Role |
