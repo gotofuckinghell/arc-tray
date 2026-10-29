@@ -10,6 +10,8 @@ typedef struct {
   int is_string;          // 0 = REG_DWORD, 1 = REG_SZ
   DWORD on_dw, off_dw;
   const wchar_t *on_sz, *off_sz;
+  DWORD bit;        // non-zero: set/clear this bit instead of writing on_dw/off_dw
+  int revert_write; // 1: revert writes the "off" value instead of deleting the value
 } TweakStep;
 
 typedef struct {

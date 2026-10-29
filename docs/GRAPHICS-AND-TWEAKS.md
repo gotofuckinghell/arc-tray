@@ -138,6 +138,11 @@ is drawn, and "Revert" deletes the values (Windows defaults return).
 | `net-throttling` | Network throttling limit off | `NetworkThrottlingIndex=0xFFFFFFFF`, OFF `10` | no |
 | `timer-resolution` | Global high-resolution timers | `Session Manager\kernel\GlobalTimerResolutionRequests=1`, OFF absent | yes |
 | `win32-priority` | Win32PrioritySeparation (foreground boost) | `0x26`, OFF `0x2` (Windows default) | yes |
+| `async-flips` | Disable async flips (`Display1_DisableAsyncFlips=1`, adapter class key) | 1, OFF 0 | no |
+| `overlay-ds` | Overlay quality enhancement off (`GraphicsDrivers\Disable_OverlayDSQualityEnhancement`) | 1, OFF 0 | helps |
+| `hw-overlay` | Disable DirectX hardware overlay (`HKLM\SOFTWARE\Microsoft\DirectX\DisableHWOverlay`) | 1, OFF 0 | no |
+| `sched-queue` | GPU scheduler queue limit (`GraphicsDrivers\Scheduler\HwQueuedRenderPacketGroupLimit`) | 2, OFF 0 (community note: 1 *decreases* FPS) | no |
+| `dpst` | Panel power saving off (bit 5 of `FeatureTestControl`, adapter class key) | set bit 0x20, revert clears it | no |
 
 Measured round-trip on this machine (MMCSS): ON wrote `GPU Priority=8`, `Priority=6`,
 `Scheduling Category=High`, `SFIO Priority=High` (verified with PowerShell), revert

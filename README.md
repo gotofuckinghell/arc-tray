@@ -61,10 +61,14 @@ with a timestamp, so a third-party tool that quietly rewrites these settings is 
 
 ### Registry tweaks
 
-Nine reversible settings with a one-line description each: hardware-accelerated GPU
+Fourteen reversible settings with a one-line description each: hardware-accelerated GPU
 scheduling, MPO workaround, Game DVR, fullscreen optimisations, MMCSS "Games" priority,
 MMCSS system responsiveness, network throttling, global timer resolution,
-`Win32PrioritySeparation`. `--tweak=<id>:on|off|revert`, or the menu.
+`Win32PrioritySeparation`, plus the display/scheduler findings — **disable async flips**
+(`Display1_DisableAsyncFlips`, adapter class key), **overlay quality enhancement off**,
+**DirectX hardware overlay off**, **GPU scheduler queue limit 2**
+(`HwQueuedRenderPacketGroupLimit`) and **panel power saving (DPST) off** (bit 5 of
+`FeatureTestControl`). `--tweak=<id>:on|off|revert`, or the menu.
 
 ## Requirements
 

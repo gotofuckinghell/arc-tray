@@ -11,6 +11,23 @@ All notable changes are recorded here. The project follows
 Every release is tagged `vMAJOR.MINOR.PATCH`; `src/version.h` is the single source of
 truth for the number the binary reports.
 
+## 1.9.0
+
+- **Five new registry tweaks from the driver research**: `async-flips`
+  (`Display1_DisableAsyncFlips` in the adapter class key), `overlay-ds`
+  (`GraphicsDrivers\Disable_OverlayDSQualityEnhancement`), `hw-overlay`
+  (`DirectX\DisableHWOverlay`), `sched-queue`
+  (`GraphicsDrivers\Scheduler\HwQueuedRenderPacketGroupLimit`, 2 instead of 0; the
+  community note is that 1 *decreases* FPS) and `dpst` (bit 5 of `FeatureTestControl`,
+  a no-op on desktop cards but the documented DPST switch).
+- Tweak engine: `%ADAPTER%` in a path is resolved at runtime by scanning
+  `Class\{4d36e968-…}\0000…` for the Intel `DriverDesc`, so a machine with two GPUs still
+  hits the Arc entry; steps can now **set/clear a bit** instead of writing a whole DWORD;
+  and a step can mark `revert_write` so revert restores the driver's own value instead of
+  deleting it (deleting `Display1_DisableAsyncFlips`/`FeatureTestControl` would destroy
+  values the driver created).
+- Menu and `--tweaks` now list 14 tweaks with the same one-line explanations.
+
 ## 1.8.2
 
 Static audit (OpenCode `--agent plan` over `tray.c`/`arc.c`/`gfx.c`/`tweaks.c`, plus manual
