@@ -63,14 +63,16 @@ Source-path asserts recovered from 9150 (none of the older builds carry them):
    This is consistent with the live probe (`vramMemSpeedLimit supported=0`,
    `ERROR_UNSUPPORTED_FEATURE`): there is nothing to patch in the KMD for this feature.
 2. **VF curve**: the KMD has no VF wording either; `ctlOverclockReadVFCurve` fails with
-   `ERROR_DATA_READ`, i.e. the data source (firmware table) is absent on DG2, not a hidden
-   switch.
+   `ERROR_DATA_READ` on all four modes. That is a read failure, **not** `UNSUPPORTED_FEATURE`,
+   so the honest reading is "the call exists and the data cannot be obtained on this card";
+   whether the source is missing entirely stays an open question.
 3. **I2C**: 9150 is the first package whose KMD actually carries the I2C module
    (`igrdI2c.c`, `INTC_I2C`, "I2C load disabled", "I2C device cookie not discovered").
    That matches the missing `Intel_NF_I2C.sys` child driver — the KMD side is ready, the
    bus driver is not installed.
-4. **Power throttling**: strings disappeared in 9150, so the logic moved into the PMT
-   module; that is where a real PL4/OCP investigation would start.
+4. **Power throttling**: the EU/slice throttle strings disappeared in 9150 and the only
+   PL4-shaped marker left is a lone `KPL4` token. There is no PL4 *control* interface in any
+   KMD, but "no strings" is not proof of "no code" — PL4 stays an open question.
 5. **Dynamic work**: 9150 exposes an ETW event catalogue, so the next step can be
    trace-based (GPUView/WPR) instead of static guessing.
 

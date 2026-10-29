@@ -35,7 +35,7 @@ Availability column = live probe on driver 9150 (`src/probe_features.c`).
 | 4 | `CMAA` | 0 off, 1 override MSAA, 2 enhance app | works | morphological AA; `override` replaces app MSAA |
 | 5 | `TEXTURE_FILTERING_QUALITY` | 0 performance, 1 balanced, 2 quality | `UNSUPPORTED_FEATURE` | driver texture-filter quality |
 | 6 | `ADAPTIVE_TESSELLATION` | 0 off, 1 on | `UNSUPPORTED_FEATURE` | reduces tessellation where it is invisible |
-| 7 | `SHARPENING_FILTER` | 0 off, 1 on | `UNSUPPORTED_FEATURE` | driver sharpening (Intel's RIS analogue) |
+| 7 | `SHARPENING_FILTER` | 0 off, 1 on | `UNSUPPORTED_FEATURE` | driver sharpening (Intel's RIS analogue); distinct from the display-side sharpness API below |
 | 8 | `MSAA` | 0 app, 1 off, 2×, 4×, 8×, 16× | `UNSUPPORTED_FEATURE` | forced MSAA |
 | 9 | `GAMING_FLIP_MODES` | bitmask: 1 app default, 2 vsync off, 4 vsync on, 8 smooth sync, 16 speed frame, 32 capped to panel, 64 vsync-off ignoring allow-list | works | presentation model: `vsync off` converts sync flips to async, `smooth sync` reduces tearing with async flips, `speed frame` = application-unaware triple buffering, `capped` limits FPS to panel rate |
 | 10 | `ADAPTIVE_SYNC_PLUS` | custom struct | `UNSUPPORTED_FEATURE` | VRR range/behaviour override |
@@ -78,7 +78,7 @@ cameras. It enhances a video stream; the render resolution of a game never touch
 - `ctlGetSetDisplaySettings` — scaling mode (`identity`, `centered`, `stretched`,
   `aspect-ratio centered`, custom), colour format, bpc, wire format. This is **output**
   scaling; it cannot make the GPU render above native and downsample.
-- `ctlGetSharpnessCaps` / `ctlGetCurrentSharpness` / `ctlSetSharpness` — panel-side
+- `ctlGetSharpnessCaps` / `ctlGetCurrentSharpness` / `ctlSetCurrentSharpness` — panel-side
   sharpening (affects everything on screen, including games, but does not change
   resolution).
 - `ctlGetSetRetroScaling` — integer/retro scaling for low-resolution content.
