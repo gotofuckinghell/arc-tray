@@ -127,7 +127,7 @@ The `CURRENT` limit flag cannot be raised on this card:
   higher one changes nothing — 800 W is the ceiling, and the card stops at ~280 W long
   before it.
 
-So the ~289 W peak is a hardware OCP/VRM limit. The only ways around it are
+So ~289 W was earlier read as a hardware OCP/VRM ceiling — that reading was wrong: later runs reached 330 W peak with the same limit set, so PL4/OCP is a protection trip rather than a fixed wall. The ways to push further are
 vBIOS-level (signed, no mods on this SKU) or a shunt mod, which does not apply to the
 A770 — the card measures current through the MPS/MP2979 controller plus PL4, not
 through a shunt resistor.

@@ -13,7 +13,7 @@ Result codes used below: `0x0` success, `0x4000000A` `ERROR_UNSUPPORTED_FEATURE`
 
 | Control | API | Range on the A770 | Notes |
 |---|---|---|---|
-| Power limit | Sysman `zesPowerSetLimits`, IGCL V2 as fallback | 115–398 W accepted, real ceiling ~289 W | hardware OCP/PL4 stops the card regardless of the register |
+| Power limit | Sysman `zesPowerSetLimits`, IGCL V2 as fallback | 115–398 W accepted | real draw tracks the limit into the low 300s (330 W peak measured); PL4/OCP is a protection trip, not a fixed ceiling |
 | Core offset | `ctlOverclockGpuFrequencyOffsetSetV2` → V1 | 0…+300 MHz | offset shifts the whole V/F curve, not a cap; readback within ±12 MHz of the driver grid |
 | Voltage offset | `ctlOverclockGpuMaxVoltageOffsetSetV2` | 0…+288 mV | positive only; writing 0 mV resets **all** IGCL overclock controls, so PL/core/temp are snapshotted and restored |
 | Temperature limit | IGCL V2 (60–90 °C), bundled 2023 runtime (91–115 °C) | 60–115 °C | the driver refuses >90; the 2023 runtime is unsigned and hash-pinned |

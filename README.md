@@ -238,7 +238,7 @@ you try it, open an issue with the output of `arctray.exe --selftest`.
 | Tray working set | 16 MB (with the hardware handle released: 8.5 MB) |
 | `--gfx-watch` process | 23 MB |
 | Binary | ~91 KB, static |
-| Power limit 398 W requested | accepted and read back; real draw ~289 W peak / ~260 W average |
+| Power limit 398 W requested | accepted and read back; draw follows the limit into the low 300s (330 W peak measured), no fixed 289 W wall |
 | Overclock ladder (llama-bench SYCL) | +150 MHz/+100 mV → 2752 MHz @ 342 W · +200/+150 → 2800 MHz @ 345 W · +299/+287 → TDR |
 
 ## License
