@@ -3,6 +3,43 @@
 Status legend: **TODO** (agreed, not started), **PROBE** (needs one measurement first),
 **BLOCKED** (driver/hardware refuses), **DONE** (shipped).
 
+## F-003 — "Virtual Super Resolution" / Arc Super Resolution — BLOCKED as a driver feature
+
+**Question that keeps coming back:** does Intel have something like AMD VSR / NVIDIA DSR
+(render above the panel resolution and downsample), and does Arc Power's "Arc Super
+Resolution" mean we can expose it too?
+
+**Answer: no driver feature.** Facts:
+
+- `igcl_api.h` has no supersampling / virtual-resolution API. The only "super resolution"
+  entry is `CTL_VIDEO_PROCESSING_FEATURE_SUPER_RESOLUTION = 4` — the **video** pipeline
+  (flags `DEFAULT`, `CONFERENCE`, `CAMERA`), disabled by default and documented as needing
+  Intel activation. It does not touch game rendering.
+- The display-side APIs are `ctlGetSetCustomMode` (custom **source** sizes only:
+  `SourceX`/`SourceY`, no timings), `ctlSetCurrentScaling`, `ctlGetSetRetroScaling` — these
+  scale *down* from a smaller source or add integer scaling. None of them render above the
+  panel resolution.
+- Arc Power's "Arc Super Resolution (ASR)" is **their own application-side upscaler**, not an
+  Intel feature: per its README, it "enlarge[s] a smaller windowed game to your display using
+  the smoother thumbnail path" — i.e. the game runs windowed at a lower resolution and a host
+  window stretches it (DWM thumbnail / DirectComposition class of trick), with Alt-Tab
+  restore and optional sharpening. Their `validateDisplaySuperResolutionCapability` guards a
+  Windows source-resolution change, not a GPU mode.
+
+**Consequences for ArcTray**
+
+| Route | Verdict | Why |
+|---|---|---|
+| Driver VSR/DSR toggle | **BLOCKED** | no such API in IGCL; the display engine does not supersample |
+| Video super resolution | **BLOCKED** | video pipeline, default off, "contact Intel for activation" |
+| Custom source mode + scaling | **TODO (small)** | can expose non-native *source* sizes and scaling mode; that is downscale/upscale, not supersampling |
+| ASR-style window upscaler | **OUT OF SCOPE (separate project)** | needs a host window, DWM thumbnail/DirectComposition, per-game process tracking and anti-cheat considerations; does not fit a 10 MB tray tool |
+
+**If the goal is sharper image at native resolution**, the practical in-repo options are the
+already-shipped ones: XeSS frame generation override (id 17), CMAA (id 4), display-side
+sharpness (`ctlSetCurrentSharpness`, F/P9) and the in-game resolution-scale slider (outside
+our control).
+
 ## F-002 — Everything lives next to the exe (portable discipline) — TODO
 
 **Rule.** All state the program itself creates belongs in the folder with `arctray.exe`:
