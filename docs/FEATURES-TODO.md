@@ -3,6 +3,46 @@
 Status legend: **TODO** (agreed, not started), **PROBE** (needs one measurement first),
 **BLOCKED** (driver/hardware refuses), **DONE** (shipped).
 
+## F-002 — Everything lives next to the exe (portable discipline) — TODO
+
+**Rule.** All state the program itself creates belongs in the folder with `arctray.exe`:
+INI, logs, snapshots, watch logs, backups. Nothing is scattered through `%APPDATA%`,
+`%LOCALAPPDATA%`, `%TEMP%` or the registry *for the program's own data*. Copy the folder to
+another machine and the whole state travels with it.
+
+**Only two deliberate exceptions**
+
+1. **Driver DLLs that may need swapping.** `IntelControlLib.dll` lives in the DriverStore and
+   is not ours to move; the version-override story is "put a pinned `IntelControlLib-XXXX.dll`
+   next to the exe and let the loader prefer it" (the 2023 runtime today, the 5333 runtime for
+   the undervolt experiment tomorrow). Those files stay external and hash-pinned — the program
+   never copies DLLs into the system.
+2. **Registry tweaks.** They are registry values by definition (HAGS, MPO, MMCSS…). They stay
+   opt-in, reversible, and never used to store application state.
+
+**Current paths vs. the rule**
+
+| What | Now | Should be |
+|---|---|---|
+| `arctray.ini` (profiles) | exe dir, `%APPDATA%\ArcTray\` fallback | exe dir; fallback only if the folder is read-only |
+| `arctray.log` | exe dir | exe dir |
+| `gfx-snapshot.ini` | `%APPDATA%\ArcTray\` | **exe dir** (`--gfx-save` default) |
+| `gfx-watch.log` | `%APPDATA%\ArcTray\` | **exe dir** |
+| tweak backups | not stored | exe dir, `tweaks-backup.ini`, written before the first apply |
+
+**Work**
+
+- Move the default snapshot/watch paths to the exe directory, keep `--gfx-save=<file>` as the
+  explicit override, and fall back to `%APPDATA%\ArcTray` **only** when the exe folder is not
+  writable (read-only install, `Program Files`).
+- Print the resolved paths in `--state` (or `--paths`) so it is obvious where data went.
+- One-time migration: if an `%APPDATA%\ArcTray\` file exists and the exe-dir file does not,
+  move it on first start and log the move.
+- Snapshot the previous tweak values into `tweaks-backup.ini` before writing, so a revert can
+  restore the user's originals instead of the hard-coded defaults.
+- Acceptance: after a fresh run, nothing new appears outside the exe folder except the two
+  documented exceptions; `--paths` lists every file the program can touch.
+
 ## F-001 — Menu must stay open after toggling an item — TODO
 
 **Problem.** The tray menu is a `TrackPopupMenu` popup. Every item selection (a checkmark,
