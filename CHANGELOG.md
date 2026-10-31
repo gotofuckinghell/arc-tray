@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.00350
+
+- **No more Python and PowerShell in the repository.** `tools/make_icon.py` is gone and the
+  icon is a tracked file (`res/arc.ico`), so `build.sh` needs only the mingw-w64 compiler. The
+  four PowerShell helpers (`open_menu`, `close_tray`, `list_windows`, `shot`) are deleted.
+- **New CLI options, same job without PowerShell:** `--menu` posts the tray window a request
+  to open its menu at the current cursor (`WM_TRAY`/`WM_RBUTTONUP`), `--quit` closes it via
+  `WM_CLOSE`. Both return 1 when no tray is running.
+- Fixed in the same pass: `--quit` first posted `WM_COMMAND 9004`, which the tray only handles
+  from its own popup, so it did nothing; it now posts `WM_CLOSE` and the process exits.
+
 ## 0.0.00125
 
 Versioning switched to the requested scheme: `0.0.<base><quarters>`, where `base` grows by

@@ -1117,6 +1117,14 @@ int main(int argc, char **argv) {
     return 0;
   }
   if (!arc_open(&g_arc, err, sizeof err)) { fprintf(stderr, "open failed: %s\n", err); return 2; }
+  if (!strcmp(argv[1], "--menu") || !strcmp(argv[1], "--quit")) {
+    HWND tray = FindWindowW(L"ArcTrayWnd", NULL);
+    if (!tray) { fprintf(stderr, "ArcTray tray is not running\n"); return 1; }
+    if (argv[1][2] == 'm') PostMessageW(tray, WM_TRAY, 0, WM_RBUTTONUP);   // open at the cursor
+    else PostMessageW(tray, WM_CLOSE, 0, 0);                              // wndproc: WM_DESTROY -> quit
+    printf("%s sent to hwnd %p\n", argv[1], (void *)tray);
+    return 0;
+  }
   if (!strcmp(argv[1], "--state")) { print_state(); arc_close(&g_arc); return 0; }
   if (!strcmp(argv[1], "--caps")) { print_caps(); arc_close(&g_arc); return 0; }
   if (!strcmp(argv[1], "--selftest")) { print_selftest(); arc_close(&g_arc); return 0; }

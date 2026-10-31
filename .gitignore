@@ -5,7 +5,7 @@ probe_sysman.exe
 probe_ext.exe
 probe_*.exe
 probe_3d*.exe
-arc.ico
+/arc.ico
 build.log
 out.txt
 

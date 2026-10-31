@@ -131,6 +131,8 @@ arctray.exe --selftest                  OS build, driver, which IGCL/Sysman symb
 arctray.exe --caps                      advertised ranges and current targets
 arctray.exe --about                     version, attribution, links
 arctray.exe --menudump                  print the menu tree (labels + ids)
+arctray.exe --menu                      ask the running tray to open its menu (at the cursor)
+arctray.exe --quit                      ask the running tray to exit
 ```
 
 Full reference, exit codes and examples: [docs/CLI.md](docs/CLI.md).
@@ -160,8 +162,9 @@ frame-gen 17 0 0
 
 ## Build
 
-Requires an x64 mingw-w64 gcc (Strawberry Perl ships one as `x86_64-w64-mingw32-gcc`) and
-Python 3 for the icon generator.
+Requires only an x64 mingw-w64 gcc (Strawberry Perl ships one as
+`x86_64-w64-mingw32-gcc`). The icon is a tracked file (`res/arc.ico`), so no Python is needed
+any more.
 
 ```bash
 bash build.sh             # -> arctray.exe + arc.ico

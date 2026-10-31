@@ -169,6 +169,9 @@ arctray.exe --about
   were resolved — the first thing to attach to a bug report.
 - `--caps` prints advertised ranges, Sysman availability and current targets.
 - `--menudump` prints the tray menu tree with ids (debugging).
+- `--menu` posts the tray window a request to open its menu at the current cursor position;
+  `--quit` asks it to exit. Both are the replacement for the old PowerShell helpers and both
+  need a running tray (exit code 1 otherwise).
 - `--about` prints the version, attribution and links.
 
 ## Environment variables

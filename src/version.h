@@ -12,18 +12,18 @@
 
 #define ARCTRAY_VERSION_MAJOR 0
 #define ARCTRAY_VERSION_MINOR 0
-#define ARCTRAY_VERSION_BASE 1     // +1 per new option
-#define ARCTRAY_VERSION_QUARTER 1  // +1 per fixed bug (= +0.25)
+#define ARCTRAY_VERSION_BASE 3     // +1 per new option
+#define ARCTRAY_VERSION_QUARTER 2  // +1 per fixed bug (= +0.25)
 
 // Literal strings on purpose: the preprocessor cannot zero-pad or evaluate arithmetic
 // inside #stringify. Keep BASE_STR / QUARTER_STR in sync with the numbers above.
-#define ARCTRAY_VERSION_BASE_STR "001"
-#define ARCTRAY_VERSION_QUARTER_STR "25"   // "", "25", "50", "75"
+#define ARCTRAY_VERSION_BASE_STR "003"
+#define ARCTRAY_VERSION_QUARTER_STR "50"   // "", "25", "50", "75"
 
 #define ARCTRAY_VERSION_STR \
   "0.0." ARCTRAY_VERSION_BASE_STR ARCTRAY_VERSION_QUARTER_STR
 
-#define ARCTRAY_VERSION_BASE_WSTR L"001"
-#define ARCTRAY_VERSION_QUARTER_WSTR L"25"
+#define ARCTRAY_VERSION_BASE_WSTR L"003"
+#define ARCTRAY_VERSION_QUARTER_WSTR L"50"
 #define ARCTRAY_VERSION_WSTR \
   L"0.0." ARCTRAY_VERSION_BASE_WSTR ARCTRAY_VERSION_QUARTER_WSTR
