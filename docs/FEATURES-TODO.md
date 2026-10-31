@@ -33,7 +33,29 @@ Resolution" mean we can expose it too?
 | Driver VSR/DSR toggle | **BLOCKED** | no such API in IGCL; the display engine does not supersample |
 | Video super resolution | **BLOCKED** | video pipeline, default off, "contact Intel for activation" |
 | Custom source mode + scaling | **TODO (small)** | can expose non-native *source* sizes and scaling mode; that is downscale/upscale, not supersampling |
-| ASR-style window upscaler | **OUT OF SCOPE (separate project)** | needs a host window, DWM thumbnail/DirectComposition, per-game process tracking and anti-cheat considerations; does not fit a 10 MB tray tool |
+| ASR-style window upscaler | **TODO (borrowable, small)** | see below — Arc Power ships a 198-line GPL-2.0 implementation |
+
+**Can we borrow an implementation? Yes.**
+
+- **Arc Power itself** (`github.com/YamsSE/Arc-Power`, GPL-2.0 — the same licence as this
+  project) implements ASR in `src/main/sharpening-runtime/ArcPower.ThumbnailAsr.h`, 198 lines
+  of C++ with no D3D device, no duplication surface, no input interception and no present
+  loop. Mechanism: a layered host window on the target monitor +
+  `DwmRegisterThumbnail(source)` + `DwmUpdateThumbnailProperties` (destination rect, opacity),
+  `HWND_TOPMOST`, `SetWindowDisplayAffinity(WDA_NONE)`, Alt-Tab restore, retry-safe cleanup.
+  Porting it to C is ~200–300 lines of Win32 (`dwmapi`), i.e. effort S–M.
+  Reading it costs nothing; copying code into our GPL-2.0 tree is licence-compatible (keep the
+  attribution in `THIRD_PARTY_NOTICES.txt`).
+- Optional sharpening on top: their `ArcPower.ScreenSharpen.cpp` (986 lines, D2D/HLSL overlay)
+  is a bigger port; the cheap version is the display-side `ctlSetCurrentSharpness` (P9).
+- **Magpie** (`Blinue/Magpie`, 16k stars) is the other well-known open-source window upscaler,
+  but it is **GPL-3.0**, so its code cannot be linked into a GPL-2.0 project — usable as a
+  design reference only (FSR/NIS/Anime4K shaders, capture+present pipeline).
+
+**Constraints of the DWM-thumbnail route** (same as Arc Power): the game must run windowed or
+borderless and smaller than the display; DWM scales with its own filter (no FSR/XeSS quality);
+exclusive fullscreen is unsupported; there is no injection, so anti-cheat sees nothing unusual;
+Alt-Tab must restore the original window; a multi-monitor/DXGI output change needs re-targeting.
 
 **If the goal is sharper image at native resolution**, the practical in-repo options are the
 already-shipped ones: XeSS frame generation override (id 17), CMAA (id 4), display-side
